@@ -7,6 +7,7 @@ import { employees as initialEmployees, timesheetEntries as initialEntries } fro
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Hourglass, BarChart, CheckSquare } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 import TimesheetForm from '@/components/timesheet/timesheet-form';
 import TimesheetTable from '@/components/timesheet/timesheet-table';
@@ -14,22 +15,18 @@ import CalendarView from '@/components/timesheet/calendar-view';
 import IndividualSummary from '@/components/reports/individual-summary';
 import StatsCard from '@/components/dashboard/stats-card';
 
-// In a real app, this would come from an auth context
-// For now, we'll cycle through users to show limited access.
-const USER_IDS = ['2', '3', '4', '5'];
-let currentUserIndex = 0;
-if (typeof window !== 'undefined') {
-  currentUserIndex = (currentUserIndex + 1) % USER_IDS.length;
-}
-const CURRENT_USER_ID = USER_IDS[currentUserIndex];
-
-
 export default function UserDashboardPage() {
-  const [employees] = useState<Employee[]>(initialEmployees);
+  const { user } = useAuth();
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [timesheetEntries, setTimesheetEntries] = useState<TimesheetEntry[]>(initialEntries);
-  const [currentUser] = useState<Employee>(() => employees.find(e => e.id === CURRENT_USER_ID)!);
+
+  const currentUser = useMemo(() => {
+    return user ? employees.find(e => e.id === user.id)! : null;
+  }, [user, employees]);
+
 
   const handleSaveEntry = (newEntry: Omit<TimesheetEntry, 'id' | 'employeeId'>) => {
+     if (!currentUser) return;
     setTimesheetEntries(prevEntries => [
       {
         ...newEntry,
@@ -41,8 +38,8 @@ export default function UserDashboardPage() {
   };
   
   const myEntries = useMemo(() => 
-    timesheetEntries.filter(entry => entry.employeeId === currentUser.id), 
-    [timesheetEntries, currentUser.id]
+    currentUser ? timesheetEntries.filter(entry => entry.employeeId === currentUser.id) : [], 
+    [timesheetEntries, currentUser]
   );
 
   const myHoursThisWeek = useMemo(() => {
@@ -63,6 +60,10 @@ export default function UserDashboardPage() {
      );
      return tasks.size;
   }, [myEntries]);
+  
+  if (!currentUser) {
+    return <div className="flex h-full w-full items-center justify-center"><p>Loading user data...</p></div>;
+  }
 
   return (
     <div className="flex flex-col gap-6">

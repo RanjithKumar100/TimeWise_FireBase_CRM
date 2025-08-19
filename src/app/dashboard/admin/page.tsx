@@ -8,29 +8,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Hourglass, BarChart, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 
 import TimesheetTable from '@/components/timesheet/timesheet-table';
 import CalendarView from '@/components/timesheet/calendar-view';
 import TeamSummary from '@/components/reports/team-summary';
 import StatsCard from '@/components/dashboard/stats-card';
-
-const CURRENT_USER_ID = '1';
+import ManageUsers from '@/components/admin/manage-users';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [employees] = useState<Employee[]>(initialEmployees);
+  const { user } = useAuth();
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [timesheetEntries] = useState<TimesheetEntry[]>(initialEntries);
-  const [currentUser] = useState<Employee>(() => {
-    const user = employees.find(e => e.id === CURRENT_USER_ID)!;
-    if (user.role !== 'Manager') {
-       // In a real app, you'd handle this more gracefully.
-       // For now, redirect if a non-manager lands here.
-       if (typeof window !== 'undefined') {
-         router.replace('/dashboard/user');
-       }
+
+  React.useEffect(() => {
+    // Redirect if not a manager
+    if (user && user.role !== 'Manager') {
+      router.replace('/dashboard/user');
     }
-    return user;
-  });
+  }, [user, router]);
+  
+  const handleUserAdded = (newUser: Employee) => {
+      setEmployees(prev => [...prev, newUser]);
+  }
 
   const totalHoursThisWeek = useMemo(() => {
     const oneWeekAgo = new Date();
@@ -51,7 +52,7 @@ export default function AdminDashboardPage() {
      return projects.size;
   }, [timesheetEntries]);
 
-  if (currentUser.role !== 'Manager') {
+  if (!user || user.role !== 'Manager') {
     return <div className="flex h-full w-full items-center justify-center"><p>Access Denied. Redirecting...</p></div>;
   }
 
@@ -65,9 +66,10 @@ export default function AdminDashboardPage() {
       </div>
 
       <Tabs defaultValue="team-summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
           <TabsTrigger value="team-summary">Team Summary</TabsTrigger>
           <TabsTrigger value="all-entries">All Entries</TabsTrigger>
+          <TabsTrigger value="manage-users">Manage Users</TabsTrigger>
         </TabsList>
         
         <TabsContent value="team-summary" className="mt-4">
@@ -94,6 +96,9 @@ export default function AdminDashboardPage() {
                   <CalendarView entries={timesheetEntries} employees={employees} />
                </TabsContent>
             </Tabs>
+        </TabsContent>
+         <TabsContent value="manage-users" className="mt-4">
+            <ManageUsers employees={employees} onUserAdded={handleUserAdded} />
         </TabsContent>
       </Tabs>
     </div>

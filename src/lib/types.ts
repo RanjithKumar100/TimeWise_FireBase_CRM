@@ -14,6 +14,7 @@ export type Employee = {
   id: string;
   name: string;
   role: 'Employee' | 'Manager';
+  password?: string;
 };
 
 export type AggregatedVerticleData = {

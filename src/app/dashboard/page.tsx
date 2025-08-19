@@ -2,24 +2,23 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { employees } from '@/lib/data';
-import type { Employee } from '@/lib/types';
-
-// Assume current user is 'Alex Johnson' who is a Manager
-const CURRENT_USER_ID = '1';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function DashboardRedirectPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    const currentUser = employees.find(e => e.id === CURRENT_USER_ID);
-    
-    if (currentUser?.role === 'Manager') {
+    if (loading) return; // Wait until user data is loaded
+
+    if (!user) {
+      router.replace('/login');
+    } else if (user.role === 'Manager') {
       router.replace('/dashboard/admin');
     } else {
       router.replace('/dashboard/user');
     }
-  }, [router]);
+  }, [router, user, loading]);
 
   return (
     <div className="flex h-full w-full items-center justify-center">

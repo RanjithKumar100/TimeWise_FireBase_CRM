@@ -1,11 +1,11 @@
 import type { Employee, TimesheetEntry, Verticle } from '@/lib/types';
 
 export const employees: Employee[] = [
-  { id: '1', name: 'Alex Johnson', role: 'Manager' },
-  { id: '2', name: 'Maria Garcia', role: 'Employee' },
-  { id: '3', name: 'James Smith', role: 'Employee' },
-  { id: '4', name: 'Priya Patel', role: 'Employee' },
-  { id: '5', name: 'Kenji Tanaka', role: 'Employee' },
+  { id: '1', name: 'Alex Johnson', role: 'Manager', password: 'password-admin' },
+  { id: '2', name: 'Maria Garcia', role: 'Employee', password: 'password-user1' },
+  { id: '3', name: 'James Smith', role: 'Employee', password: 'password-user2' },
+  { id: '4', name: 'Priya Patel', role: 'Employee', password: 'password-user3' },
+  { id: '5', name: 'Kenji Tanaka', role: 'Employee', password: 'password-user4' },
 ];
 
 const today = new Date();
