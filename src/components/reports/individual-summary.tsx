@@ -1,18 +1,23 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { TimesheetEntry, Verticle, AggregatedVerticleData } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { TimesheetEntry, Verticle, AggregatedVerticleData, Employee } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import SummaryChart from './summary-chart';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
+import { downloadDataAsExcel } from '@/lib/utils';
+
 
 interface IndividualSummaryProps {
   entries: TimesheetEntry[];
+  employees: Employee[];
 }
 
 const verticles: Verticle[] = ['CMIS', 'TRI', 'LOF', 'TRG'];
 
-export default function IndividualSummary({ entries }: IndividualSummaryProps) {
+export default function IndividualSummary({ entries, employees }: IndividualSummaryProps) {
   const aggregatedData = useMemo<AggregatedVerticleData[]>(() => {
     const dataMap = new Map<Verticle, number>();
     verticles.forEach(v => dataMap.set(v, 0));
@@ -30,6 +35,12 @@ export default function IndividualSummary({ entries }: IndividualSummaryProps) {
   const totalHours = useMemo(() => {
     return entries.reduce((sum, entry) => sum + entry.hours, 0);
   }, [entries]);
+  
+  const handleDownload = () => {
+    const employeeId = entries[0]?.employeeId;
+    const employeeName = employees.find(e => e.id === employeeId)?.name || 'individual';
+    downloadDataAsExcel(entries, employees, `${employeeName}-timesheet`);
+  };
 
   return (
     <Card>
@@ -69,6 +80,12 @@ export default function IndividualSummary({ entries }: IndividualSummaryProps) {
           </div>
         </div>
       </CardContent>
+       <CardFooter className="justify-end">
+          <Button onClick={handleDownload} disabled={entries.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              Download Excel
+          </Button>
+      </CardFooter>
     </Card>
   );
 }

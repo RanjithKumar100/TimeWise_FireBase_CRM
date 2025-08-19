@@ -2,10 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import type { Employee, TimesheetEntry, Verticle, AggregatedVerticleData } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import SummaryChart from './summary-chart';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
+import { downloadDataAsExcel } from '@/lib/utils';
 
 interface TeamSummaryProps {
   entries: TimesheetEntry[];
@@ -23,6 +26,13 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
     }
     return entries.filter(entry => entry.employeeId === selectedEmployeeId);
   }, [entries, selectedEmployeeId]);
+  
+  const handleDownload = () => {
+    const fileName = selectedEmployeeId === 'all' 
+      ? 'all-team-timesheet' 
+      : `${employees.find(e => e.id === selectedEmployeeId)?.name}-timesheet` || 'individual-timesheet';
+    downloadDataAsExcel(selectedEntries, employees, fileName);
+  };
 
   const aggregatedData = useMemo<AggregatedVerticleData[]>(() => {
     const dataMap = new Map<Verticle, number>();
@@ -64,20 +74,26 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
       <Card>
         <CardHeader>
           <CardTitle>Team Member Drilldown</CardTitle>
-          <CardDescription>Select a team member to see their individual summary.</CardDescription>
+          <CardDescription>Select a team member to see their individual summary or download their data.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-            <SelectTrigger className="w-[280px]">
-              <SelectValue placeholder="Select an employee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Team Members</SelectItem>
-              {employees.map(emp => (
-                <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap gap-4 items-center">
+            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <SelectTrigger className="w-[280px]">
+                <SelectValue placeholder="Select an employee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Team Members</SelectItem>
+                {employees.map(emp => (
+                  <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+             <Button onClick={handleDownload} disabled={selectedEntries.length === 0} variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Download Excel
+            </Button>
+          </div>
           <SummaryChart data={aggregatedData} />
         </CardContent>
       </Card>

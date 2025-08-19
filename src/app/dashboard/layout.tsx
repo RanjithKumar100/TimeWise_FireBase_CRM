@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Clock, LayoutDashboard, User, BarChart } from 'lucide-react';
+import { Clock, LayoutDashboard, User, BarChart, Shield } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -41,10 +41,18 @@ export default function DashboardLayout({
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={true} tooltip="Dashboard">
-                  <Link href="/dashboard">
+                <SidebarMenuButton asChild tooltip="Dashboard">
+                  <Link href="/dashboard/user">
                     <LayoutDashboard />
                     <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+               <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Admin">
+                  <Link href="/dashboard/admin">
+                    <Shield />
+                    <span>Admin</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

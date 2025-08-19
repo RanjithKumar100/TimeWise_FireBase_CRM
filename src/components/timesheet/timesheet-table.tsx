@@ -41,6 +41,7 @@ export default function TimesheetTable({ entries, employees }: TimesheetTablePro
           onChange={(e) => setFilter(e.target.value)}
           className="max-w-sm"
         />
+        {employees.length > 1 && (
          <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by employee" />
@@ -52,13 +53,14 @@ export default function TimesheetTable({ entries, employees }: TimesheetTablePro
             ))}
           </SelectContent>
         </Select>
+        )}
       </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Employee</TableHead>
+              {employees.length > 1 && <TableHead>Employee</TableHead>}
               <TableHead>Verticle</TableHead>
               <TableHead>Country</TableHead>
               <TableHead>Task</TableHead>
@@ -69,7 +71,7 @@ export default function TimesheetTable({ entries, employees }: TimesheetTablePro
             {filteredEntries.map((entry) => (
               <TableRow key={entry.id}>
                 <TableCell>{format(entry.date, 'MMM d, yyyy')}</TableCell>
-                <TableCell>{employeeMap.get(entry.employeeId) ?? 'Unknown'}</TableCell>
+                {employees.length > 1 && <TableCell>{employeeMap.get(entry.employeeId) ?? 'Unknown'}</TableCell>}
                 <TableCell>{entry.verticle}</TableCell>
                 <TableCell>{entry.country}</TableCell>
                 <TableCell>{entry.task}</TableCell>
@@ -78,7 +80,7 @@ export default function TimesheetTable({ entries, employees }: TimesheetTablePro
             ))}
             {filteredEntries.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={employees.length > 1 ? 6 : 5} className="h-24 text-center">
                         No results found.
                     </TableCell>
                 </TableRow>
