@@ -9,6 +9,7 @@ import SummaryChart from './summary-chart';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { downloadDataAsExcel } from '@/lib/utils';
+import { verticleColors } from '@/lib/colors';
 
 interface TeamSummaryProps {
   entries: TimesheetEntry[];
@@ -108,7 +109,17 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Employee</TableHead>
-                            {verticles.map(v => <TableHead key={v} className="text-right">{v}</TableHead>)}
+                            {verticles.map(v => (
+                              <TableHead key={v} className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div 
+                                    className="w-3 h-3 rounded-sm" 
+                                    style={{ backgroundColor: verticleColors[v as keyof typeof verticleColors] }}
+                                  ></div>
+                                  {v}
+                                </div>
+                              </TableHead>
+                            ))}
                             <TableHead className="text-right font-bold">Total</TableHead>
                         </TableRow>
                     </TableHeader>

@@ -5,11 +5,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { Employee, TimesheetEntry } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, Hourglass, BarChart, CheckSquare, AlertTriangle, Shield } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Clock, Hourglass, BarChart, CheckSquare, AlertTriangle, Shield, Download, Filter } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 import TimesheetForm from '@/components/timesheet/timesheet-form';
 import TimesheetTableWithPermissions from '@/components/timesheet/timesheet-table-with-permissions';
@@ -38,8 +42,10 @@ export default function UserDashboardPage() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
+  const [allWorkLogs, setAllWorkLogs] = useState<WorkLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<WorkLogEntry | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   const currentUser: Employee | null = useMemo(() => {
     return user ? {
@@ -56,7 +62,7 @@ export default function UserDashboardPage() {
   const fetchWorkLogs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/worklogs', {
+      const response = await fetch('/api/worklogs?limit=1000', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
         }
@@ -73,6 +79,7 @@ export default function UserDashboardPage() {
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
       }));
+      setAllWorkLogs(logs);
       setWorkLogs(logs);
     } catch (error) {
       toast({
@@ -83,6 +90,67 @@ export default function UserDashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Generate month options for the last 12 months
+  const generateMonthOptions = () => {
+    const options = [{ value: 'all', label: 'All Months' }];
+    const now = new Date();
+    
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      options.push({ value: monthKey, label: monthLabel });
+    }
+    
+    return options;
+  };
+
+  const monthOptions = generateMonthOptions();
+
+  // Filter work logs by selected month
+  useEffect(() => {
+    if (selectedMonth === 'all') {
+      setWorkLogs(allWorkLogs);
+    } else {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const filtered = allWorkLogs.filter(log => {
+        const logDate = new Date(log.date);
+        return logDate.getFullYear() === year && logDate.getMonth() + 1 === month;
+      });
+      setWorkLogs(filtered);
+    }
+  }, [selectedMonth, allWorkLogs]);
+
+  // Export to Excel
+  const exportToExcel = () => {
+    const exportData = workLogs.map(log => ({
+      'Date': log.date.toLocaleDateString(),
+      'Verticle': log.verticle,
+      'Country': log.country,
+      'Task': log.task,
+      'Hours': log.hours,
+      'Created At': log.createdAt.toLocaleDateString()
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Work Logs');
+    
+    const monthLabel = selectedMonth === 'all' ? 'All_Months' : 
+      monthOptions.find(opt => opt.value === selectedMonth)?.label.replace(' ', '_') || selectedMonth;
+    
+    const fileName = `My_Work_Logs_${monthLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, fileName);
+
+    toast({
+      title: "Success",
+      description: "Work logs exported successfully",
+    });
   };
 
   useEffect(() => {
@@ -266,6 +334,39 @@ export default function UserDashboardPage() {
             </AlertDescription>
           </Alert>
         )}
+      </div>
+
+      {/* Filter Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <label htmlFor="month-filter" className="text-sm font-medium">Filter by Month:</label>
+          </div>
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select month" />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedMonth !== 'all' && (
+            <Badge variant="secondary" className="text-xs">
+              Filtered: {monthOptions.find(opt => opt.value === selectedMonth)?.label}
+            </Badge>
+          )}
+          <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Export to Excel ({workLogs.length} entries)
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

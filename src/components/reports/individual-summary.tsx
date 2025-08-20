@@ -8,6 +8,7 @@ import SummaryChart from './summary-chart';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { downloadDataAsExcel } from '@/lib/utils';
+import { verticleColors } from '@/lib/colors';
 
 
 interface IndividualSummaryProps {
@@ -63,7 +64,15 @@ export default function IndividualSummary({ entries, employees }: IndividualSumm
               <TableBody>
                 {aggregatedData.map(({ verticle, totalHours: verticleHours }) => (
                   <TableRow key={verticle}>
-                    <TableCell className="font-medium">{verticle}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-sm" 
+                          style={{ backgroundColor: verticleColors[verticle as keyof typeof verticleColors] }}
+                        ></div>
+                        {verticle}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">{verticleHours.toFixed(1)}</TableCell>
                     <TableCell className="text-right">
                       {totalHours > 0 ? ((verticleHours / totalHours) * 100).toFixed(1) : 0}%

@@ -57,8 +57,8 @@ export default function DashboardLayout({
         <Sidebar className="border-r">
           <SidebarHeader>
             <div className="flex h-14 items-center gap-2 px-2">
-              <Clock className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-semibold text-primary-foreground">TimeWise</h1>
+              <img src="robot (2).png" alt="Clock" className="h-3 w-3" />
+              <h1 className="text-2xl font-semibold text-primary-foreground">TimeWise</h1>
             </div>
           </SidebarHeader>
           <SidebarContent>

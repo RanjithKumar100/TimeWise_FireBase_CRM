@@ -1,6 +1,6 @@
 'use client';
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
 import {
   ChartConfig,
   ChartContainer,
@@ -8,6 +8,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import type { AggregatedVerticleData } from '@/lib/types';
+import { verticleColors } from '@/lib/colors';
 
 interface SummaryChartProps {
   data: AggregatedVerticleData[];
@@ -19,19 +20,19 @@ const chartConfig = {
   },
   CMIS: {
     label: 'CMIS',
-    color: 'hsl(var(--chart-1))',
+    color: verticleColors.CMIS,
   },
   TRI: {
     label: 'TRI',
-    color: 'hsl(var(--chart-2))',
+    color: verticleColors.TRI,
   },
   LOF: {
     label: 'LOF',
-    color: 'hsl(var(--chart-3))',
+    color: verticleColors.LOF,
   },
   TRG: {
     label: 'TRG',
-    color: 'hsl(var(--chart-4))',
+    color: verticleColors.TRG,
   },
 } satisfies ChartConfig;
 
@@ -52,9 +53,12 @@ export default function SummaryChart({ data }: SummaryChartProps) {
             cursor={false}
             content={<ChartTooltipContent indicator="dot" />}
           />
-          <Bar dataKey="totalHours" fill="var(--color-verticle)" radius={4}>
-            {data.map((item) => (
-                <Bar key={item.verticle} dataKey="totalHours" fill={chartConfig[item.verticle]?.color || 'hsl(var(--primary))'} />
+          <Bar dataKey="totalHours" radius={4}>
+            {data.map((item, index) => (
+              <Cell 
+                key={`${item.verticle}-${index}`} 
+                fill={chartConfig[item.verticle as keyof typeof chartConfig]?.color || verticleColors.CMIS} 
+              />
             ))}
           </Bar>
         </BarChart>

@@ -5,12 +5,16 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { Employee } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, Hourglass, BarChart, Users, Shield, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Clock, Hourglass, BarChart, Users, Shield, AlertTriangle, Download, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 import TimesheetTableWithPermissions from '@/components/timesheet/timesheet-table-with-permissions';
 import CalendarView from '@/components/timesheet/calendar-view';
@@ -42,8 +46,11 @@ export default function AdminDashboardPage() {
   const { toast } = useToast();
   const [users, setUsers] = useState<Employee[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
+  const [allWorkLogs, setAllWorkLogs] = useState<WorkLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<WorkLogEntry | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedUser, setSelectedUser] = useState<string>('all');
 
   const fetchUsers = async () => {
     try {
@@ -79,7 +86,7 @@ export default function AdminDashboardPage() {
 
   const fetchWorkLogs = async () => {
     try {
-      const response = await fetch('/api/worklogs?limit=100', {
+      const response = await fetch('/api/worklogs?limit=1000', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
         }
@@ -96,6 +103,7 @@ export default function AdminDashboardPage() {
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
       }));
+      setAllWorkLogs(logs);
       setWorkLogs(logs);
     } catch (error) {
       toast({
@@ -104,6 +112,80 @@ export default function AdminDashboardPage() {
         variant: "destructive",
       });
     }
+  };
+
+  // Generate month options for the last 12 months
+  const generateMonthOptions = () => {
+    const options = [{ value: 'all', label: 'All Months' }];
+    const now = new Date();
+    
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      options.push({ value: monthKey, label: monthLabel });
+    }
+    
+    return options;
+  };
+
+  const monthOptions = generateMonthOptions();
+
+  // Filter work logs by selected month and user
+  useEffect(() => {
+    let filtered = allWorkLogs;
+
+    // Filter by month
+    if (selectedMonth !== 'all') {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      filtered = filtered.filter(log => {
+        const logDate = new Date(log.date);
+        return logDate.getFullYear() === year && logDate.getMonth() + 1 === month;
+      });
+    }
+
+    // Filter by user
+    if (selectedUser !== 'all') {
+      filtered = filtered.filter(log => log.employeeId === selectedUser);
+    }
+
+    setWorkLogs(filtered);
+  }, [selectedMonth, selectedUser, allWorkLogs]);
+
+  // Export to Excel
+  const exportToExcel = () => {
+    const exportData = workLogs.map(log => ({
+      'Date': log.date.toLocaleDateString(),
+      'Employee': log.employeeName,
+      'Email': log.employeeEmail,
+      'Role': log.employeeRole,
+      'Verticle': log.verticle,
+      'Country': log.country,
+      'Task': log.task,
+      'Hours': log.hours,
+      'Created At': log.createdAt.toLocaleDateString()
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Team Work Logs');
+    
+    const monthLabel = selectedMonth === 'all' ? 'All_Months' : 
+      monthOptions.find(opt => opt.value === selectedMonth)?.label.replace(' ', '_') || selectedMonth;
+    
+    const userLabel = selectedUser === 'all' ? 'All_Users' : 
+      users.find(u => u.id === selectedUser)?.name.replace(' ', '_') || selectedUser;
+    
+    const fileName = `Team_Work_Logs_${userLabel}_${monthLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, fileName);
+
+    toast({
+      title: "Success",
+      description: "Team work logs exported successfully",
+    });
   };
 
   useEffect(() => {
@@ -299,10 +381,68 @@ export default function AdminDashboardPage() {
         )}
       </div>
 
+      {/* Filter Controls */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <label className="text-sm font-medium">Filter by Month:</label>
+            </div>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium">Filter by User:</label>
+            <Select value={selectedUser} onValueChange={setSelectedUser}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
+                {users.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name} ({user.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <div className="flex items-center gap-2">
+            {selectedMonth !== 'all' && (
+              <Badge variant="secondary" className="text-xs">
+                Month: {monthOptions.find(opt => opt.value === selectedMonth)?.label}
+              </Badge>
+            )}
+            {selectedUser !== 'all' && (
+              <Badge variant="secondary" className="text-xs">
+                User: {users.find(u => u.id === selectedUser)?.name}
+              </Badge>
+            )}
+          </div>
+          <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Export to Excel ({workLogs.length} entries)
+          </Button>
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard title="Total Hours (Week)" value={totalHoursThisWeek.toFixed(1)} icon={Clock} />
         <StatsCard title="Projects (Month)" value={projectsThisMonth} icon={Hourglass} />
-        <StatsCard title="Total Hours (All)" value={workLogs.reduce((sum, entry) => sum + entry.hours, 0).toFixed(1)} icon={BarChart} />
+        <StatsCard title="Total Hours (Filtered)" value={workLogs.reduce((sum, entry) => sum + entry.hours, 0).toFixed(1)} icon={BarChart} />
         <StatsCard title="Team Size" value={users.filter(emp => emp.isActive).length} icon={Users} />
       </div>
 
