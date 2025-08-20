@@ -1,63 +1,107 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { Employee } from '@/lib/types';
-import { employees } from '@/lib/data'; // In a real app, this would be an API call
+import type { Employee, UserRole } from '@/lib/types';
+import { isAdmin, canManageUsers, canViewAllData } from '@/lib/permissions';
+import { apiClient, ApiError } from '@/lib/api';
 
 interface AuthContextType {
   user: Employee | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  isAdmin: () => boolean;
+  canManageUsers: () => boolean;
+  canViewAllData: () => boolean;
+  hasRole: (role: UserRole) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const AUTH_STORAGE_KEY = 'timewise-auth-user';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    initializeAuth();
+  }, []);
+
+  const initializeAuth = async () => {
     try {
-      const storedUser = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      const token = apiClient.getToken();
+      if (token) {
+        // Validate token by fetching current user
+        const response = await apiClient.getCurrentUser();
+        if (response.success && response.data) {
+          const userData = response.data.user;
+          setUser({
+            id: userData.id,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            isActive: userData.isActive,
+          });
+        } else {
+          // Invalid token, clear it
+          apiClient.logout();
+        }
       }
     } catch (error) {
-      console.error("Failed to parse user from localStorage", error);
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+      console.error('Failed to initialize auth:', error);
+      apiClient.logout();
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   const login = async (username: string, password: string): Promise<boolean> => {
     setLoading(true);
-    // This is a mock authentication. In a real app, you'd make an API call.
-    const foundUser = employees.find(
-      (emp) => emp.name.toLowerCase() === username.toLowerCase() && emp.password === password
-    );
-
-    if (foundUser) {
-      const { password, ...userToStore } = foundUser;
-      setUser(userToStore as Employee);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userToStore));
-      setLoading(false);
-      return true;
-    } else {
+    
+    try {
+      const response = await apiClient.login(username, password);
+      
+      if (response.success && response.data) {
+        const userData = response.data.user;
+        setUser({
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          isActive: userData.isActive,
+        });
+        setLoading(false);
+        return true;
+      } else {
+        setLoading(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
       setLoading(false);
       return false;
     }
   };
 
   const logout = () => {
+    apiClient.logout();
     setUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
-  const value = { user, loading, login, logout };
+  const checkIsAdmin = () => user ? isAdmin(user) : false;
+  const checkCanManageUsers = () => user ? canManageUsers(user) : false;
+  const checkCanViewAllData = () => user ? canViewAllData(user) : false;
+  const hasRole = (role: UserRole) => user ? user.role === role : false;
+
+  const value = { 
+    user, 
+    loading, 
+    login, 
+    logout,
+    isAdmin: checkIsAdmin,
+    canManageUsers: checkCanManageUsers,
+    canViewAllData: checkCanViewAllData,
+    hasRole
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

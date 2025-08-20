@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, LayoutDashboard, Shield, LogOut, User } from 'lucide-react';
+import { Clock, LayoutDashboard, Shield, LogOut, User, Settings } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -71,12 +71,22 @@ export default function DashboardLayout({
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {user.role === 'Manager' && (
+              {user.role === 'Admin' && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Admin">
                     <Link href="/dashboard/admin">
                       <Shield />
                       <span>Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {user.role === 'Admin' && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Settings">
+                    <Link href="/dashboard/settings">
+                      <Settings />
+                      <span>Settings</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

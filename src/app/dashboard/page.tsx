@@ -13,7 +13,7 @@ export default function DashboardRedirectPage() {
 
     if (!user) {
       router.replace('/login');
-    } else if (user.role === 'Manager') {
+    } else if (user.role === 'Admin') {
       router.replace('/dashboard/admin');
     } else {
       router.replace('/dashboard/user');

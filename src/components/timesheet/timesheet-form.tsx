@@ -21,7 +21,7 @@ import { suggestTimesheetDetails, SuggestTimesheetDetailsOutput } from '@/ai/flo
 import { Badge } from '../ui/badge';
 
 
-const verticles: Verticle[] = ['CMIS', 'TRI', 'LOF', 'TRG'];
+const verticles = ['CMIS', 'TRI', 'LOF', 'TRG'] as const;
 
 const formSchema = z.object({
   date: z.date({ required_error: 'A date is required.' }),
@@ -34,12 +34,14 @@ const formSchema = z.object({
 type TimesheetFormValues = z.infer<typeof formSchema>;
 
 interface TimesheetFormProps {
-  onSave: (data: Omit<TimesheetEntry, 'id' | 'employeeId'>) => void;
+  onSave: (data: Omit<TimesheetEntry, 'id' | 'employeeId' | 'createdAt' | 'updatedAt'>) => void;
   currentUser: Employee;
   myTasks: string[];
+  editingEntry?: TimesheetEntry | null;
+  onCancel?: () => void;
 }
 
-export default function TimesheetForm({ onSave, currentUser, myTasks }: TimesheetFormProps) {
+export default function TimesheetForm({ onSave, currentUser, myTasks, editingEntry, onCancel }: TimesheetFormProps) {
   const { toast } = useToast();
   const [suggestions, setSuggestions] = useState<SuggestTimesheetDetailsOutput | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -47,21 +49,30 @@ export default function TimesheetForm({ onSave, currentUser, myTasks }: Timeshee
   const form = useForm<TimesheetFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date(),
-      country: '',
-      task: '',
-      hours: 8,
+      date: editingEntry?.date || new Date(),
+      verticle: editingEntry?.verticle,
+      country: editingEntry?.country || '',
+      task: editingEntry?.task || '',
+      hours: editingEntry?.hours || 8,
     },
   });
 
   const onSubmit = (data: TimesheetFormValues) => {
     onSave(data);
-    form.reset();
+    if (!editingEntry) {
+      form.reset();
+    }
     setSuggestions(null);
     toast({
-      title: 'Entry Saved!',
-      description: 'Your time has been successfully logged.',
+      title: editingEntry ? 'Entry Updated!' : 'Entry Saved!',
+      description: editingEntry ? 'Your time entry has been updated.' : 'Your time has been successfully logged.',
     });
+  };
+
+  const handleCancel = () => {
+    form.reset();
+    setSuggestions(null);
+    onCancel?.();
   };
 
   const handleGetSuggestions = async () => {
@@ -89,15 +100,20 @@ export default function TimesheetForm({ onSave, currentUser, myTasks }: Timeshee
     }
   };
 
-  const applySuggestion = <K extends keyof TimesheetFormValues>(field: K, value: TimesheetFormValues[K]) => {
+  const applySuggestion = (field: keyof TimesheetFormValues, value: any) => {
      form.setValue(field, value, { shouldValidate: true });
   }
 
   return (
     <Card className="shadow-sm">
       <CardHeader>
-        <CardTitle>Log Your Time</CardTitle>
-        <CardDescription>Fill in the details for your work session.</CardDescription>
+        <CardTitle>{editingEntry ? 'Edit Time Entry' : 'Log Your Time'}</CardTitle>
+        <CardDescription>
+          {editingEntry 
+            ? 'Update the details for this work session.'
+            : 'Fill in the details for your work session.'
+          }
+        </CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -208,11 +224,22 @@ export default function TimesheetForm({ onSave, currentUser, myTasks }: Timeshee
             )}
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" type="button" onClick={handleGetSuggestions} disabled={isSuggesting}>
-              {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              Suggest
+            <div className="flex gap-2">
+              {!editingEntry && (
+                <Button variant="outline" type="button" onClick={handleGetSuggestions} disabled={isSuggesting}>
+                  {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                  Suggest
+                </Button>
+              )}
+              {editingEntry && onCancel && (
+                <Button variant="outline" type="button" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+            <Button type="submit">
+              {editingEntry ? 'Update Entry' : 'Save Entry'}
             </Button>
-            <Button type="submit">Save Entry</Button>
           </CardFooter>
         </form>
       </Form>

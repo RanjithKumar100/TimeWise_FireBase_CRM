@@ -21,7 +21,7 @@ interface ManageUsersProps {
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
-  role: z.enum(['Employee', 'Manager'], { required_error: 'Please select a role.' }),
+  role: z.enum(['User', 'Admin'], { required_error: 'Please select a role.' }),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
 
@@ -31,7 +31,7 @@ export default function ManageUsers({ employees, onUserAdded }: ManageUsersProps
   const { toast } = useToast();
   const form = useForm<UserFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: '', role: 'Employee', password: '' },
+    defaultValues: { name: '', role: 'User', password: '' },
   });
 
   const onSubmit = (data: UserFormValues) => {
@@ -40,6 +40,8 @@ export default function ManageUsers({ employees, onUserAdded }: ManageUsersProps
     const newUser: Employee = {
       id: (employees.length + 1 + Math.random()).toString(), // Simple unique ID
       ...data,
+      isActive: true,
+      email: `${data.name.toLowerCase().replace(' ', '.')}@timewise.com`,
     };
     onUserAdded(newUser);
     form.reset();
@@ -111,8 +113,8 @@ export default function ManageUsers({ employees, onUserAdded }: ManageUsersProps
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Employee">Employee</SelectItem>
-                        <SelectItem value="Manager">Manager</SelectItem>
+                        <SelectItem value="User">User</SelectItem>
+                        <SelectItem value="Admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
