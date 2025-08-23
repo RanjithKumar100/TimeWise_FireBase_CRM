@@ -18,7 +18,7 @@ import type { TimesheetEntry, Employee } from '@/lib/types';
 interface TimesheetTableProps {
   entries: TimesheetEntry[];
   employees: Employee[];
-  onEdit: (entry: TimesheetEntry) => void;
+  onEdit?: (entry: TimesheetEntry) => void;
   onDelete: (entryId: string) => void;
   showAllUsers?: boolean;
 }
@@ -116,10 +116,10 @@ export default function TimesheetTableWithPermissions({
   };
 
   const handleEdit = (entry: TimesheetEntry) => {
-    if (!user) return;
+    if (!user || !onEdit) return;
     
-    const permissions = getPermissionStatus(entry);
-    if (permissions?.canEdit) {
+    // Admin can edit any entry, users need permission check
+    if (isAdmin() || getPermissionStatus(entry)?.canEdit) {
       onEdit(entry);
     }
   };
@@ -131,12 +131,16 @@ export default function TimesheetTableWithPermissions({
 
   const canUserEdit = (entry: TimesheetEntry) => {
     if (!user) return false;
+    // Admin can edit any entry, users need permission check
+    if (isAdmin()) return true;
     const permissions = getPermissionStatus(entry);
     return permissions?.canEdit || false;
   };
 
   const canUserDelete = (entry: TimesheetEntry) => {
     if (!user) return false;
+    // Admin can delete any entry, users need permission check
+    if (isAdmin()) return true;
     const permissions = getPermissionStatus(entry);
     return permissions?.canDelete || false;
   };
@@ -191,9 +195,11 @@ export default function TimesheetTableWithPermissions({
                   </TableCell>
                   {showAllUsers && isAdmin() && (
                     <TableCell>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-1">
                         <span className="font-medium">{getEmployeeName(entry.employeeId)}</span>
-                        <span className="text-xs text-muted-foreground">{getEmployeeRole(entry.employeeId)}</span>
+                        <Badge variant={getEmployeeRole(entry.employeeId) === 'Admin' ? 'default' : 'secondary'} className="w-fit text-xs">
+                          {getEmployeeRole(entry.employeeId)}
+                        </Badge>
                       </div>
                     </TableCell>
                   )}
@@ -206,19 +212,29 @@ export default function TimesheetTableWithPermissions({
                   </TableCell>
                   <TableCell>{entry.hours}h</TableCell>
                   <TableCell>
-                    {renderPermissionIndicator(entry)}
+                    {entry.status === 'rejected' ? (
+                      <Badge variant="destructive" className="text-xs">
+                        Rejected
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        Approved
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(entry)}
-                        disabled={!canUserEdit(entry)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
+                      {onEdit && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(entry)}
+                          disabled={!canUserEdit(entry)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       
                       <AlertDialog 
                         open={deleteConfirmId === entry.id} 
@@ -229,18 +245,19 @@ export default function TimesheetTableWithPermissions({
                             variant="outline"
                             size="sm"
                             onClick={() => setDeleteConfirmId(entry.id)}
-                            disabled={!canUserDelete(entry)}
+                            disabled={!canUserDelete(entry) || entry.status === 'rejected'}
                             className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            title={entry.status === 'rejected' ? 'Already rejected' : 'Reject entry'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Time Entry</AlertDialogTitle>
+                            <AlertDialogTitle>Reject Time Entry</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to delete this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
-                              This action cannot be undone.
+                              Are you sure you want to reject this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
+                              The user will see this entry as rejected in their dashboard.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -249,7 +266,7 @@ export default function TimesheetTableWithPermissions({
                               onClick={() => handleDelete(entry.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                              Delete Entry
+                              Reject Entry
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

@@ -26,6 +26,9 @@ interface WorkLogEntry {
   country: string;
   task: string;
   hours: number;
+  status?: 'approved' | 'rejected';
+  rejectedAt?: Date;
+  rejectedBy?: string;
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
@@ -76,6 +79,8 @@ export default function UserDashboardPage() {
         date: new Date(log.date),
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
+        status: log.status || 'approved',
+        rejectedAt: log.rejectedAt ? new Date(log.rejectedAt) : undefined,
       }));
       setAllWorkLogs(logs);
       setWorkLogs(logs);
@@ -257,11 +262,11 @@ export default function UserDashboardPage() {
     setEditingEntry(null);
   };
 
-  const myHoursThisWeek = useMemo(() => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const myHoursThisMonth = useMemo(() => {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     return workLogs
-      .filter(entry => entry.date > oneWeekAgo)
+      .filter(entry => entry.date > oneMonthAgo)
       .reduce((sum, entry) => sum + entry.hours, 0);
   }, [workLogs]);
   
@@ -326,10 +331,9 @@ export default function UserDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="My Hours (Week)" value={myHoursThisWeek.toFixed(1)} icon={Clock} />
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatsCard title="My Hours (Month)" value={myHoursThisMonth.toFixed(1)} icon={Clock} />
         <StatsCard title="My Tasks (Month)" value={myTasksThisMonth} icon={CheckSquare} />
-        <StatsCard title="My Total Hours" value={workLogs.reduce((sum, entry) => sum + entry.hours, 0).toFixed(1)} icon={BarChart} />
         <StatsCard title="Editable Entries" value={`${editableEntries}/${workLogs.length}`} icon={Hourglass} />
       </div>
 

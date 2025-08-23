@@ -37,9 +37,30 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# genkit
+.genkit/
 .genkit/*
+
+# environment variables (contains sensitive data)
 .env*
+!.env.example
 
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# Claude IDE files
+.claude/
+.claude/*
+
+# test files
+test-*.js
+test-*.bat
+*.json
+login-response.json
+
+# logs
+*.log
+
+# temporary files
+nul

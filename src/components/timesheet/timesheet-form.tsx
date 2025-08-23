@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -52,6 +52,18 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
       hours: editingEntry?.hours || 8,
     },
   });
+
+  useEffect(() => {
+    if (editingEntry) {
+      form.reset({
+        date: editingEntry.date,
+        verticle: editingEntry.verticle,
+        country: editingEntry.country,
+        task: editingEntry.task,
+        hours: editingEntry.hours,
+      });
+    }
+  }, [editingEntry, form]);
 
   const onSubmit = (data: TimesheetFormValues) => {
     // Validate 6-day rule for non-admin users

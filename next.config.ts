@@ -19,11 +19,35 @@ const nextConfig: NextConfig = {
     ],
   },
   // Production server configuration
-  experimental: {
-    serverComponentsExternalPackages: ['mongoose'],
+  serverExternalPackages: ['mongoose'],
+  
+  // Allow cross-origin requests from network devices
+  async headers() {
+    return [
+      {
+        source: '/api/(.*)',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
+          },
+        ],
+      },
+    ];
   },
-  // Enable standalone output for better deployment
-  output: 'standalone',
+  
+  // Configure development options
+  experimental: {
+    // Future experimental features can be configured here
+  },
 };
 
 export default nextConfig;

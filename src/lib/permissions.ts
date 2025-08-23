@@ -101,7 +101,7 @@ export function canViewAllData(user: Employee): boolean {
 export function getRoleDisplayName(role: UserRole): string {
   switch (role) {
     case 'Admin':
-      return 'Administrator';
+      return 'Admin';
     case 'User':
       return 'User';
     default:

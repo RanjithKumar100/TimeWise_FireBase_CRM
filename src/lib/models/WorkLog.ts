@@ -8,6 +8,9 @@ export interface IWorkLog extends Document {
   country: string;
   task: string;
   hoursSpent: number;
+  status: 'approved' | 'rejected';
+  rejectedAt?: Date;
+  rejectedBy?: string;
   createdAt: Date;
   updatedAt: Date;
   canEdit(currentUserId: string, currentUserRole: string): boolean;
@@ -55,6 +58,17 @@ const WorkLogSchema: Schema = new Schema(
       required: [true, 'Hours spent is required'],
       min: [0.5, 'Minimum hours is 0.5'],
       max: [24, 'Maximum hours per entry is 24'],
+    },
+    status: {
+      type: String,
+      enum: ['approved', 'rejected'],
+      default: 'approved',
+    },
+    rejectedAt: {
+      type: Date,
+    },
+    rejectedBy: {
+      type: String,
     },
   },
   {

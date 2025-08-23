@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, LayoutDashboard, Shield, LogOut, User, Settings } from 'lucide-react';
+import { Clock, LayoutDashboard, Shield, LogOut, User, Settings, Bell } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { NotificationDropdown } from '@/components/dashboard/notification-dropdown';
 
 
 export default function DashboardLayout({
@@ -97,6 +98,7 @@ export default function DashboardLayout({
             <div className="flex-1">
               {/* Optional: Add search or other header content here */}
             </div>
+            <NotificationDropdown />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">

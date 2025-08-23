@@ -1,4 +1,31 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9002';
+// Function to get the correct API base URL
+function getApiBaseUrl(): string {
+  // First, check environment variable
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    console.log('🔧 Using NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // On client side, try to detect the current host
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    
+    // If accessing via IP or network address, use the same for API
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      const apiUrl = `${protocol}//${hostname}:9002`;
+      console.log('🔧 Auto-detected API URL:', apiUrl);
+      return apiUrl;
+    }
+  }
+  
+  // Fallback to localhost for development
+  const fallbackUrl = 'http://localhost:9002';
+  console.log('🔧 Using fallback API URL:', fallbackUrl);
+  return fallbackUrl;
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -20,16 +47,18 @@ class ApiError extends Error {
 }
 
 class ApiClient {
-  private baseUrl: string;
   private token: string | null = null;
 
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl;
-    
+  constructor() {
     // Load token from localStorage on client side
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('timewise-auth-token');
     }
+  }
+
+  // Get base URL dynamically to handle network changes
+  private getBaseUrl(): string {
+    return getApiBaseUrl();
   }
 
   setToken(token: string | null) {
@@ -51,7 +80,7 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}/api${endpoint}`;
+    const url = `${this.getBaseUrl()}/api${endpoint}`;
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -62,10 +91,19 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    console.log('🌐 API Request:', {
+      method: options.method || 'GET',
+      url,
+      hasAuth: !!this.token,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       const response = await fetch(url, {
         ...options,
         headers,
+        // Add timeout to prevent hanging requests
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       const data: ApiResponse<T> = await response.json();
@@ -75,25 +113,53 @@ class ApiClient {
       }
 
       return data;
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof ApiError) {
         throw error;
       }
       
+      // Handle different types of network errors
+      let errorMessage = 'Network error or server unavailable';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timeout - server may be slow or unavailable';
+      } else if (error.code === 'ECONNREFUSED' || error.message.includes('fetch')) {
+        errorMessage = `Cannot connect to server at ${url}. Make sure the server is running on port 9002.`;
+      }
+      
+      console.error('API Request Failed:', {
+        url,
+        error: error.message,
+        type: error.name
+      });
+      
       // Network or other errors
       throw new ApiError(
-        'Network error or server unavailable',
+        errorMessage,
         0,
-        { success: false, message: 'Network error', data: null }
+        { success: false, message: errorMessage, data: null }
       );
     }
   }
 
   // Authentication methods
   async login(username: string, password: string) {
+    console.log('🔐 Login attempt:', {
+      username,
+      apiUrl: this.getBaseUrl(),
+      timestamp: new Date().toISOString()
+    });
+    
     const response = await this.request<{ user: any }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+    });
+
+    console.log('🔐 Login response:', {
+      success: response.success,
+      hasToken: !!response.token,
+      message: response.message,
+      timestamp: new Date().toISOString()
     });
 
     if (response.success && response.token) {

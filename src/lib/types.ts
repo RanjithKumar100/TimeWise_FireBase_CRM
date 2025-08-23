@@ -9,6 +9,9 @@ export type TimesheetEntry = {
   country: string;
   task: string;
   hours: number;
+  status?: 'approved' | 'rejected';
+  rejectedAt?: Date;
+  rejectedBy?: string;
   employeeId: string;
   createdAt: Date;
   updatedAt: Date;

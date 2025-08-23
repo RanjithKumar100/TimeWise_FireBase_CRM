@@ -109,6 +109,26 @@ export async function PUT(
       if (hours < 0.5 || hours > 24) {
         return createErrorResponse('Hours must be between 0.5 and 24', 400);
       }
+
+      // Check daily 24-hour limit for updated entry
+      const checkDate = date ? new Date(date) : workLog.date;
+      const startOfDay = new Date(checkDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(checkDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const existingLogs = await WorkLog.find({
+        userId: authUser.userId,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        logId: { $ne: params.id } // Exclude current entry being updated
+      });
+
+      const totalHoursForDay = existingLogs.reduce((sum, log) => sum + log.hoursSpent, 0);
+      
+      if (totalHoursForDay + hours > 24) {
+        return createErrorResponse(`Cannot exceed 24 hours per day. Current total (excluding this entry): ${totalHoursForDay} hours. Attempting to set: ${hours} hours.`, 400);
+      }
+
       workLog.hoursSpent = hours;
     }
 
@@ -148,7 +168,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/worklogs/[id] - Delete work log with 2-day restriction
+// DELETE /api/worklogs/[id] - Reject work log (admin only)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -161,26 +181,33 @@ export async function DELETE(
       return createErrorResponse('Authentication required', 401);
     }
 
+    // Only admins can reject entries
+    if (authUser.role !== 'Admin') {
+      return createErrorResponse('Only administrators can reject entries', 403);
+    }
+
     const workLog = await WorkLog.findOne({ logId: params.id });
     if (!workLog) {
       return createErrorResponse('Work log not found', 404);
     }
 
-    // Permission check with rolling 6-day window enforcement
-    const canDelete = workLog.canEdit(authUser.userId, authUser.role);
-    if (!canDelete) {
-      if (authUser.role !== 'Admin' && workLog.userId === authUser.userId) {
-        return createErrorResponse('Delete window expired. You can only delete entries within the last 6 days (rolling window).', 403);
-      } else {
-        return createErrorResponse('Access denied', 403);
-      }
-    }
+    // Mark as rejected instead of deleting
+    workLog.status = 'rejected';
+    workLog.rejectedAt = new Date();
+    workLog.rejectedBy = authUser.userId;
+    workLog.updatedAt = new Date();
+    
+    const savedLog = await workLog.save();
+    console.log('Work log rejected and saved:', {
+      id: savedLog.logId,
+      status: savedLog.status,
+      rejectedAt: savedLog.rejectedAt,
+      rejectedBy: savedLog.rejectedBy
+    });
 
-    await WorkLog.deleteOne({ logId: params.id });
-
-    return createSuccessResponse('Work log deleted successfully');
+    return createSuccessResponse('Work log rejected successfully');
   } catch (error) {
-    console.error('Delete work log error:', error);
+    console.error('Reject work log error:', error);
     return createErrorResponse('Internal server error', 500);
   }
 }

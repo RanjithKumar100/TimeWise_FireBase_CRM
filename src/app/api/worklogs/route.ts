@@ -47,6 +47,12 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .lean();
 
+    console.log('Fetched work logs sample:', workLogs.length > 0 ? {
+      id: workLogs[0].logId,
+      status: workLogs[0].status,
+      rejectedAt: workLogs[0].rejectedAt
+    } : 'No logs found');
+
     // Get user information for each work log
     const userIds = [...new Set(workLogs.map(log => log.userId))];
     const users = await User.find({ userId: { $in: userIds } }).select('userId name email role').lean();
@@ -72,6 +78,9 @@ export async function GET(request: NextRequest) {
         country: log.country,
         task: log.task,
         hours: log.hoursSpent,
+        status: log.status || 'approved',
+        rejectedAt: log.rejectedAt,
+        rejectedBy: log.rejectedBy,
         employeeId: log.userId,
         employeeName: user?.name || 'Unknown',
         employeeEmail: user?.email || '',
@@ -130,6 +139,23 @@ export async function POST(request: NextRequest) {
     const validation = WorkLog.validateSixDayWindow(recordDate, authUser.role);
     if (!validation.isValid) {
       return createErrorResponse(validation.message || 'Invalid date', 400);
+    }
+
+    // Check daily 24-hour limit
+    const startOfDay = new Date(recordDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(recordDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingLogs = await WorkLog.find({
+      userId: authUser.userId,
+      date: { $gte: startOfDay, $lte: endOfDay }
+    });
+
+    const totalHoursForDay = existingLogs.reduce((sum, log) => sum + log.hoursSpent, 0);
+    
+    if (totalHoursForDay + hoursSpent > 24) {
+      return createErrorResponse(`Cannot exceed 24 hours per day. Current total: ${totalHoursForDay} hours. Attempting to add: ${hoursSpent} hours.`, 400);
     }
 
     // Create new work log

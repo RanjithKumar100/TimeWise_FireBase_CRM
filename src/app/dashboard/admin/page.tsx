@@ -23,6 +23,7 @@ import TeamSummary from '@/components/reports/team-summary';
 import StatsCard from '@/components/dashboard/stats-card';
 import ManageUsers from '@/components/admin/manage-users';
 import TimesheetForm from '@/components/timesheet/timesheet-form';
+import NotificationManagement from '@/components/admin/notification-management';
 
 interface WorkLogEntry {
   id: string;
@@ -31,6 +32,9 @@ interface WorkLogEntry {
   country: string;
   task: string;
   hours: number;
+  status?: 'approved' | 'rejected';
+  rejectedAt?: Date;
+  rejectedBy?: string;
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
@@ -105,6 +109,8 @@ export default function AdminDashboardPage() {
         date: new Date(log.date),
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
+        status: log.status || 'approved',
+        rejectedAt: log.rejectedAt ? new Date(log.rejectedAt) : undefined,
       }));
       setAllWorkLogs(logs);
       setWorkLogs(logs);
@@ -335,19 +341,22 @@ export default function AdminDashboardPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete work log');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to reject work log');
       }
 
-      setWorkLogs(prevLogs => prevLogs.filter(log => log.id !== entryId));
+      // Refresh the work logs to get the updated status from server
+      await fetchWorkLogs();
       
       toast({
-        title: "Success",
-        description: "Work log deleted successfully",
+        title: "Success", 
+        description: "Work log rejected successfully",
       });
     } catch (error: any) {
+      console.error('Reject work log error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete work log",
+        description: error.message || "Failed to reject work log",
         variant: "destructive",
       });
     }
@@ -380,11 +389,11 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const totalHoursThisWeek = useMemo(() => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const totalHoursThisMonth = useMemo(() => {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     return workLogs
-      .filter(entry => entry.date > oneWeekAgo)
+      .filter(entry => entry.date > oneMonthAgo)
       .reduce((sum, entry) => sum + entry.hours, 0);
   }, [workLogs]);
 
@@ -518,19 +527,18 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Total Hours (Week)" value={totalHoursThisWeek.toFixed(1)} icon={Clock} />
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatsCard title="Total Hours (Month)" value={totalHoursThisMonth.toFixed(1)} icon={Clock} />
         <StatsCard title="Projects (Month)" value={projectsThisMonth} icon={Hourglass} />
-        <StatsCard title="Total Hours (Filtered)" value={workLogs.reduce((sum, entry) => sum + entry.hours, 0).toFixed(1)} icon={BarChart} />
         <StatsCard title="Team Size" value={users.filter(emp => emp.isActive).length} icon={Users} />
       </div>
 
       <Tabs defaultValue="team-summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="team-summary">Team Summary</TabsTrigger>
           <TabsTrigger value="all-entries">All Entries</TabsTrigger>
-          <TabsTrigger value="admin-entry">Admin Entry</TabsTrigger>
           <TabsTrigger value="manage-users">Manage Users</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
         
         <TabsContent value="team-summary" className="mt-4">
@@ -547,7 +555,6 @@ export default function AdminDashboardPage() {
                  <TimesheetTableWithPermissions 
                    entries={workLogs} 
                    employees={users}
-                   onEdit={handleEditEntry}
                    onDelete={handleDeleteEntry}
                    showAllUsers={true}
                  />
@@ -558,49 +565,6 @@ export default function AdminDashboardPage() {
             </Tabs>
         </TabsContent>
 
-        <TabsContent value="admin-entry" className="mt-4">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div>
-              <TimesheetForm 
-                onSave={handleSaveEntry} 
-                currentUser={user}
-                myTasks={workLogs.map(e => e.task)}
-                editingEntry={editingEntry}
-                onCancel={handleCancelEdit}
-              />
-            </div>
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Admin Privileges
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Full Access Control:</h4>
-                    <ul className="space-y-1 text-sm text-muted-foreground">
-                      <li>• View all user data</li>
-                      <li>• Edit any timesheet entry (no time restrictions)</li>
-                      <li>• Delete any timesheet entry</li>
-                      <li>• Create entries for any user</li>
-                      <li>• Manage user accounts</li>
-                    </ul>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-medium">User Restrictions Override:</h4>
-                    <ul className="space-y-1 text-sm text-muted-foreground">
-                      <li>• Users can only edit their own entries</li>
-                      <li>• Users have rolling 6-day edit window limit</li>
-                      <li>• Users cannot access admin functions</li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
 
         <TabsContent value="manage-users" className="mt-4">
             <ManageUsers 
@@ -609,6 +573,10 @@ export default function AdminDashboardPage() {
               onUserUpdated={handleUserUpdated}
               onUserDeleted={handleUserDeleted}
             />
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-4">
+            <NotificationManagement />
         </TabsContent>
       </Tabs>
     </div>

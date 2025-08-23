@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/hooks/use-auth';
+import '@/lib/startup'; // Initialize services
 
 export const metadata: Metadata = {
   title: 'TimeWise',
