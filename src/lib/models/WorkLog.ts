@@ -25,12 +25,10 @@ const WorkLogSchema: Schema = new Schema(
       type: String,
       required: [true, 'User ID is required'],
       ref: 'User',
-      index: true,
     },
     date: {
       type: Date,
       required: [true, 'Date is required'],
-      index: true,
     },
     verticle: {
       type: String,
@@ -39,7 +37,6 @@ const WorkLogSchema: Schema = new Schema(
         values: ['CMIS', 'TRI', 'LOF', 'TRG'],
         message: 'Verticle must be one of: CMIS, TRI, LOF, TRG',
       },
-      index: true,
     },
     country: {
       type: String,
@@ -71,6 +68,35 @@ WorkLogSchema.index({ createdAt: -1 });
 WorkLogSchema.index({ verticle: 1, date: -1 });
 WorkLogSchema.index({ userId: 1, createdAt: -1 });
 
+// Helper function to validate 6-day window for data entry
+WorkLogSchema.statics.validateSixDayWindow = function (recordDate: Date, userRole: string): { isValid: boolean; message?: string } {
+  // Admin can create entries for any date
+  if (userRole === 'Admin') {
+    return { isValid: true };
+  }
+  
+  const now = new Date();
+  const sixDaysAgo = new Date();
+  sixDaysAgo.setDate(now.getDate() - 6);
+  
+  // Users can only create entries within the rolling 6-day window
+  if (recordDate < sixDaysAgo) {
+    return {
+      isValid: false,
+      message: 'You can only enter/edit data within the last 6 days.'
+    };
+  }
+  
+  if (recordDate > now) {
+    return {
+      isValid: false,
+      message: 'You cannot create entries for future dates.'
+    };
+  }
+  
+  return { isValid: true };
+};
+
 // Method to check if a work log can be edited
 WorkLogSchema.methods.canEdit = function (currentUserId: string, currentUserRole: string): boolean {
   // Admin can always edit any entry
@@ -83,25 +109,30 @@ WorkLogSchema.methods.canEdit = function (currentUserId: string, currentUserRole
     return false;
   }
   
-  // Check 2-day restriction for regular users
+  // Check rolling 6-day window based on record date
   const now = new Date();
-  const createdAt = new Date(this.createdAt);
-  const daysDifference = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+  const recordDate = new Date(this.date);
+  const daysDifference = Math.floor((now.getTime() - recordDate.getTime()) / (1000 * 60 * 60 * 24));
   
-  return daysDifference <= 2;
+  // Rolling 6-day window: can edit if record date is within last 6 days (including today)
+  return daysDifference >= 0 && daysDifference <= 6;
 };
 
-// Virtual for calculating days since creation
-WorkLogSchema.virtual('daysSinceCreation').get(function () {
+// Virtual for calculating days since record date
+WorkLogSchema.virtual('daysSinceRecordDate').get(function () {
   const now = new Date();
-  const createdAt = new Date(this.createdAt as Date);
-  return Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+  const recordDate = new Date(this.date as Date);
+  return Math.floor((now.getTime() - recordDate.getTime()) / (1000 * 60 * 60 * 24));
 });
 
-// Virtual for edit time remaining (for users)
+// Virtual for edit time remaining (for users) - rolling 6-day window from record date
 WorkLogSchema.virtual('editTimeRemaining').get(function () {
-  const daysSince = this.daysSinceCreation as number;
-  return Math.max(0, 2 - daysSince);
+  const daysSince = this.daysSinceRecordDate as number;
+  // Only return remaining days if within the valid window (0-6 days)
+  if (daysSince >= 0 && daysSince <= 6) {
+    return Math.max(0, 6 - daysSince);
+  }
+  return 0; // No time remaining if outside the window
 });
 
 // Ensure virtual fields are serialized

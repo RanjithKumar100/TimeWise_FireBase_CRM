@@ -201,14 +201,8 @@ export async function DELETE(
       return createErrorResponse('You cannot delete your own account', 400);
     }
 
-    // Check if user has work logs
+    // Get work log count for audit information (data will be preserved)
     const workLogCount = await WorkLog.countDocuments({ userId: params.id });
-    if (workLogCount > 0) {
-      return createErrorResponse(
-        `Cannot delete user with existing work logs. User has ${workLogCount} work log entries.`,
-        400
-      );
-    }
 
     // Store user data for audit log before deletion
     const deletedUserData = {
@@ -229,7 +223,7 @@ export async function DELETE(
       performedByName: authUser.name,
       performedByRole: authUser.role,
       oldValues: deletedUserData,
-      additionalInfo: 'User deleted via admin panel',
+      additionalInfo: `User deleted via admin panel. ${workLogCount > 0 ? `User had ${workLogCount} work log entries which have been preserved.` : 'User had no work log entries.'}`,
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     });

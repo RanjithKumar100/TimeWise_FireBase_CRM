@@ -56,10 +56,7 @@ export default function DashboardLayout({
       <div className="flex min-h-screen w-full bg-background">
         <Sidebar className="border-r">
           <SidebarHeader>
-            <div className="flex h-14 items-center gap-2 px-2">
-              <img src="robot (2).png" alt="Clock" className="h-3 w-3" />
               <h1 className="text-2xl font-semibold text-primary-foreground">TimeWise</h1>
-            </div>
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
@@ -104,17 +101,20 @@ export default function DashboardLayout({
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
                    <Avatar>
-                    <AvatarImage src="https://placehold.co/40x40.png" alt={user.name} data-ai-hint="person portrait" />
-                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-gray-500 text-white">{user.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem>Support</DropdownMenuItem>
-                <DropdownMenuSeparator />
+                {user.role === 'Admin' && (
+                  <>
+                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                    <DropdownMenuItem>Support</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout

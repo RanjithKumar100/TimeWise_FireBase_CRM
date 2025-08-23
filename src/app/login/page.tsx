@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
@@ -55,12 +55,18 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-secondary">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <Clock className="h-8 w-8" />
-          </div>
-          <CardTitle className="text-3xl">TimeWise</CardTitle>
-          <CardDescription>Enter your credentials to access your dashboard</CardDescription>
-        </CardHeader>
+  <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
+    <img
+      src="/toprocklogo.png"
+      alt="TopRock Logo"
+      width={125}
+      height={125}
+      className="object-contain"
+    />
+  </div>
+  <CardTitle className="text-3xl">TimeWise</CardTitle>
+  <CardDescription>Enter your credentials to access your dashboard</CardDescription>
+</CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

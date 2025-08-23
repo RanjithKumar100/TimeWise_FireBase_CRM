@@ -55,9 +55,15 @@ export async function GET(request: NextRequest) {
     // Enrich work logs with user data and permission info
     const enrichedWorkLogs = workLogs.map(log => {
       const user = userMap.get(log.userId);
+      
+      // Use the new rolling 6-day window logic
       const canEdit = authUser.role === 'Admin' || 
-        (log.userId === authUser.userId && 
-         Math.floor((Date.now() - new Date(log.createdAt).getTime()) / (1000 * 60 * 60 * 24)) <= 2);
+        (log.userId === authUser.userId && (() => {
+          const now = new Date();
+          const recordDate = new Date(log.date);
+          const daysDifference = Math.floor((now.getTime() - recordDate.getTime()) / (1000 * 60 * 60 * 24));
+          return daysDifference >= 0 && daysDifference <= 6;
+        })());
       
       return {
         id: log.logId,
@@ -117,6 +123,13 @@ export async function POST(request: NextRequest) {
 
     if (hoursSpent < 0.5 || hoursSpent > 24) {
       return createErrorResponse('Hours must be between 0.5 and 24', 400);
+    }
+
+    // Validate 6-day window rule for data entry
+    const recordDate = new Date(date);
+    const validation = WorkLog.validateSixDayWindow(recordDate, authUser.role);
+    if (!validation.isValid) {
+      return createErrorResponse(validation.message || 'Invalid date', 400);
     }
 
     // Create new work log

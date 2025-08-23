@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Production server configuration
+  experimental: {
+    serverComponentsExternalPackages: ['mongoose'],
+  },
+  // Enable standalone output for better deployment
+  output: 'standalone',
 };
 
 export default nextConfig;

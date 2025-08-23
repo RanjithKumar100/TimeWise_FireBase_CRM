@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, Hourglass, BarChart, Users, Shield, AlertTriangle, Download, Filter } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Clock, Hourglass, BarChart, Users, Shield, AlertTriangle, Download, Filter, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +51,9 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<WorkLogEntry | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
+  const [selectedUser, setSelectedUser] = useState<Employee | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
 
   const fetchUsers = async () => {
     try {
@@ -131,7 +134,18 @@ export default function AdminDashboardPage() {
 
   const monthOptions = generateMonthOptions();
 
-  // Filter work logs by selected month and user
+  // Filter users for suggestions
+  const filteredUsers = useMemo(() => {
+    if (!userSearchQuery.trim()) return [];
+    return users.filter(user => 
+      user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      user.role.toLowerCase().includes(userSearchQuery.toLowerCase())
+    ).slice(0, 8); // Show max 8 suggestions
+  }, [users, userSearchQuery]);
+
+
+  // Filter work logs by selected month and selected user
   useEffect(() => {
     let filtered = allWorkLogs;
 
@@ -144,9 +158,9 @@ export default function AdminDashboardPage() {
       });
     }
 
-    // Filter by user
-    if (selectedUser !== 'all') {
-      filtered = filtered.filter(log => log.employeeId === selectedUser);
+    // Filter by selected user
+    if (selectedUser) {
+      filtered = filtered.filter(log => log.employeeId === selectedUser.id);
     }
 
     setWorkLogs(filtered);
@@ -173,8 +187,8 @@ export default function AdminDashboardPage() {
     const monthLabel = selectedMonth === 'all' ? 'All_Months' : 
       monthOptions.find(opt => opt.value === selectedMonth)?.label.replace(' ', '_') || selectedMonth;
     
-    const userLabel = selectedUser === 'all' ? 'All_Users' : 
-      users.find(u => u.id === selectedUser)?.name.replace(' ', '_') || selectedUser;
+    const userLabel = selectedUser ? 
+      selectedUser.name.replace(/[^a-zA-Z0-9]/g, '_') : 'All_Users';
     
     const fileName = `Team_Work_Logs_${userLabel}_${monthLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
     
@@ -205,6 +219,16 @@ export default function AdminDashboardPage() {
   const handleUserAdded = (newUser: Employee) => {
     setUsers(prev => [...prev, newUser]);
     fetchUsers(); // Refresh users list
+  };
+
+  const handleUserUpdated = (updatedUser: Employee) => {
+    setUsers(prev => prev.map(user => 
+      user.id === updatedUser.id ? updatedUser : user
+    ));
+  };
+
+  const handleUserDeleted = (userId: string) => {
+    setUsers(prev => prev.filter(user => user.id !== userId));
   };
 
   const handleSaveEntry = async (newEntry: any) => {
@@ -333,6 +357,29 @@ export default function AdminDashboardPage() {
     setEditingEntry(null);
   };
 
+  const handleUserSelect = (user: Employee) => {
+    setSelectedUser(user);
+    setUserSearchQuery(user.name);
+    setShowSuggestions(false);
+  };
+
+  const handleClearUser = () => {
+    setSelectedUser(null);
+    setUserSearchQuery('');
+    setShowSuggestions(false);
+  };
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setUserSearchQuery(value);
+    setShowSuggestions(value.trim().length > 0);
+    
+    // If user clears the input, clear the selection
+    if (!value.trim()) {
+      setSelectedUser(null);
+    }
+  };
+
   const totalHoursThisWeek = useMemo(() => {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -403,20 +450,52 @@ export default function AdminDashboardPage() {
             </Select>
           </div>
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium">Filter by User:</label>
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select user" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Users</SelectItem>
-                {users.map(user => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name} ({user.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label htmlFor="user-search" className="text-sm font-medium whitespace-nowrap">Search Users:</label>
+            <div className="relative min-w-[280px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <Input
+                id="user-search"
+                type="text"
+                placeholder="Search by name, email, or role..."
+                value={userSearchQuery}
+                onChange={handleSearchInputChange}
+                onFocus={() => userSearchQuery.trim() && setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                className={`pl-10 pr-4 h-10 w-full focus:ring-2 focus:ring-primary/20 transition-all ${
+                  selectedUser ? 'bg-green-50 border-green-200' : ''
+                }`}
+              />
+              {userSearchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted"
+                  onClick={handleClearUser}
+                >
+                  ×
+                </Button>
+              )}
+              
+              {/* Suggestions Dropdown */}
+              {showSuggestions && filteredUsers.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
+                  <div className="p-1">
+                    {filteredUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className="flex items-center px-3 py-2 text-sm rounded-sm cursor-pointer hover:bg-accent transition-colors"
+                        onClick={() => handleUserSelect(user)}
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium">{user.name}</div>
+                          <div className="text-xs text-muted-foreground">{user.email} • {user.role}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
@@ -426,9 +505,9 @@ export default function AdminDashboardPage() {
                 Month: {monthOptions.find(opt => opt.value === selectedMonth)?.label}
               </Badge>
             )}
-            {selectedUser !== 'all' && (
+            {selectedUser && (
               <Badge variant="secondary" className="text-xs">
-                User: {users.find(u => u.id === selectedUser)?.name}
+                User: {selectedUser.name}
               </Badge>
             )}
           </div>
@@ -513,7 +592,7 @@ export default function AdminDashboardPage() {
                     <h4 className="font-medium">User Restrictions Override:</h4>
                     <ul className="space-y-1 text-sm text-muted-foreground">
                       <li>• Users can only edit their own entries</li>
-                      <li>• Users have 2-day edit window limit</li>
+                      <li>• Users have rolling 6-day edit window limit</li>
                       <li>• Users cannot access admin functions</li>
                     </ul>
                   </div>
@@ -524,7 +603,12 @@ export default function AdminDashboardPage() {
         </TabsContent>
 
         <TabsContent value="manage-users" className="mt-4">
-            <ManageUsers employees={users} onUserAdded={handleUserAdded} />
+            <ManageUsers 
+              employees={users} 
+              onUserAdded={handleUserAdded}
+              onUserUpdated={handleUserUpdated}
+              onUserDeleted={handleUserDeleted}
+            />
         </TabsContent>
       </Tabs>
     </div>

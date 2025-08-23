@@ -7,13 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, Hourglass, BarChart, CheckSquare, AlertTriangle, Shield, Download, Filter } from 'lucide-react';
+import { Clock, Hourglass, BarChart, CheckSquare, AlertTriangle, Shield, Filter } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
 
 import TimesheetForm from '@/components/timesheet/timesheet-form';
 import TimesheetTableWithPermissions from '@/components/timesheet/timesheet-table-with-permissions';
@@ -123,35 +121,6 @@ export default function UserDashboardPage() {
     }
   }, [selectedMonth, allWorkLogs]);
 
-  // Export to Excel
-  const exportToExcel = () => {
-    const exportData = workLogs.map(log => ({
-      'Date': log.date.toLocaleDateString(),
-      'Verticle': log.verticle,
-      'Country': log.country,
-      'Task': log.task,
-      'Hours': log.hours,
-      'Created At': log.createdAt.toLocaleDateString()
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Work Logs');
-    
-    const monthLabel = selectedMonth === 'all' ? 'All_Months' : 
-      monthOptions.find(opt => opt.value === selectedMonth)?.label.replace(' ', '_') || selectedMonth;
-    
-    const fileName = `My_Work_Logs_${monthLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
-    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, fileName);
-
-    toast({
-      title: "Success",
-      description: "Work logs exported successfully",
-    });
-  };
 
   useEffect(() => {
     if (user) {
@@ -326,14 +295,6 @@ export default function UserDashboardPage() {
             {currentUser.role}
           </Badge>
         </div>
-        {!isAdmin() && editableEntries < workLogs.length && (
-          <Alert className="max-w-md">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              {workLogs.length - editableEntries} entries locked (2-day edit limit exceeded)
-            </AlertDescription>
-          </Alert>
-        )}
       </div>
 
       {/* Filter Controls */}
@@ -362,10 +323,6 @@ export default function UserDashboardPage() {
               Filtered: {monthOptions.find(opt => opt.value === selectedMonth)?.label}
             </Badge>
           )}
-          <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export to Excel ({workLogs.length} entries)
-          </Button>
         </div>
       </div>
 

@@ -11,7 +11,7 @@ export function daysBetween(date1: Date, date2: Date): number {
 }
 
 /**
- * Checks if a user can edit a timesheet entry based on role and time constraints
+ * Checks if a user can edit a timesheet entry based on role and rolling 6-day window
  */
 export function canEditTimesheetEntry(
   entry: TimesheetEntry,
@@ -43,14 +43,16 @@ export function canEditTimesheetEntry(
     canDelete: false,
   };
 
-  // Calculate days since entry creation
-  const daysSinceCreation = daysBetween(entry.createdAt, currentDate);
-  const editTimeRemaining = Math.max(0, 2 - daysSinceCreation);
+  // Calculate days since record date using rolling 6-day window
+  const daysSinceRecordDate = daysBetween(entry.date, currentDate);
+  const editTimeRemaining = Math.max(0, 6 - daysSinceRecordDate);
 
   result.editTimeRemaining = editTimeRemaining;
 
-  // User can edit only within 2 days of creation
-  if (daysSinceCreation <= 2) {
+  // Rolling 6-day window: user can edit if record date is within last 6 days (including today)
+  // daysSinceRecordDate >= 0 ensures we don't allow future dates
+  // daysSinceRecordDate <= 6 ensures it's within the rolling window
+  if (daysSinceRecordDate >= 0 && daysSinceRecordDate <= 6) {
     result.canEdit = true;
     result.canDelete = true;
   }

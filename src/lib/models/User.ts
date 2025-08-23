@@ -60,8 +60,7 @@ const UserSchema: Schema = new Schema(
 );
 
 // Index for better query performance
-UserSchema.index({ email: 1 });
-UserSchema.index({ userId: 1 });
+// Note: email and userId indexes are already created by unique: true in schema
 UserSchema.index({ role: 1, isActive: 1 });
 
 // Hash password before saving

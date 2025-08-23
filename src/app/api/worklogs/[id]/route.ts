@@ -29,9 +29,7 @@ export async function GET(
 
     // Get user info
     const user = await User.findOne({ userId: workLog.userId }).select('name email role').lean() as any;
-    const canEdit = authUser.role === 'Admin' || 
-      (workLog.userId === authUser.userId && 
-       Math.floor((Date.now() - new Date(workLog.createdAt).getTime()) / (1000 * 60 * 60 * 24)) <= 2);
+    const canEdit = workLog.canEdit(authUser.userId, authUser.role);
 
     return createSuccessResponse('Work log retrieved successfully', {
       workLog: {
@@ -75,11 +73,11 @@ export async function PUT(
       return createErrorResponse('Work log not found', 404);
     }
 
-    // Permission check with 2-day restriction enforcement
+    // Permission check with rolling 6-day window enforcement
     const canEdit = workLog.canEdit(authUser.userId, authUser.role);
     if (!canEdit) {
       if (authUser.role !== 'Admin' && workLog.userId === authUser.userId) {
-        return createErrorResponse('Edit window expired. You can only edit entries within 2 days of creation.', 403);
+        return createErrorResponse('Edit window expired. You can only edit entries within the last 6 days (rolling window).', 403);
       } else {
         return createErrorResponse('Access denied', 403);
       }
@@ -87,8 +85,17 @@ export async function PUT(
 
     const { date, verticle, country, task, hoursSpent } = await request.json();
 
+    // Validate 6-day rule if date is being changed
+    if (date) {
+      const newDate = new Date(date);
+      const validation = WorkLog.validateSixDayWindow(newDate, authUser.role);
+      if (!validation.isValid) {
+        return createErrorResponse(validation.message || 'Invalid date', 400);
+      }
+      workLog.date = newDate;
+    }
+
     // Validation
-    if (date) workLog.date = new Date(date);
     if (verticle) {
       if (!['CMIS', 'TRI', 'LOF', 'TRG'].includes(verticle)) {
         return createErrorResponse('Invalid verticle specified', 400);
@@ -159,11 +166,11 @@ export async function DELETE(
       return createErrorResponse('Work log not found', 404);
     }
 
-    // Permission check with 2-day restriction enforcement
+    // Permission check with rolling 6-day window enforcement
     const canDelete = workLog.canEdit(authUser.userId, authUser.role);
     if (!canDelete) {
       if (authUser.role !== 'Admin' && workLog.userId === authUser.userId) {
-        return createErrorResponse('Delete window expired. You can only delete entries within 2 days of creation.', 403);
+        return createErrorResponse('Delete window expired. You can only delete entries within the last 6 days (rolling window).', 403);
       } else {
         return createErrorResponse('Access denied', 403);
       }

@@ -38,31 +38,34 @@ const chartConfig = {
 
 export default function SummaryChart({ data }: SummaryChartProps) {
   return (
-    <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-      <ResponsiveContainer width="100%" height={350}>
-        <BarChart data={data} accessibilityLayer>
-          <CartesianGrid vertical={false} />
-          <XAxis
-            dataKey="verticle"
-            tickLine={false}
-            tickMargin={10}
-            axisLine={false}
-          />
-          <YAxis />
-          <ChartTooltip
-            cursor={false}
-            content={<ChartTooltipContent indicator="dot" />}
-          />
-          <Bar dataKey="totalHours" radius={4}>
-            {data.map((item, index) => (
-              <Cell 
-                key={`${item.verticle}-${index}`} 
-                fill={chartConfig[item.verticle as keyof typeof chartConfig]?.color || verticleColors.CMIS} 
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartContainer>
+    <div className="w-full">
+      <ChartContainer config={chartConfig} className="min-h-[280px] max-w-2xl mx-auto w-full">
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={data} accessibilityLayer margin={{ top: 20, right: 30, left: 30, bottom: 20 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+            <XAxis
+              dataKey="verticle"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={true}
+              fontSize={13}
+            />
+            <YAxis fontSize={13} tickLine={false} axisLine={true} />
+            <ChartTooltip
+              cursor={false}
+              content={<ChartTooltipContent indicator="dot" />}
+            />
+            <Bar dataKey="totalHours" radius={6} maxBarSize={80}>
+              {data.map((item, index) => (
+                <Cell 
+                  key={`${item.verticle}-${index}`} 
+                  fill={chartConfig[item.verticle as keyof typeof chartConfig]?.color || verticleColors.CMIS} 
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartContainer>
+    </div>
   );
 }
