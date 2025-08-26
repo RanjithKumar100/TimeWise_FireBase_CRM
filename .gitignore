@@ -42,7 +42,8 @@ next-env.d.ts
 .genkit/*
 
 # environment variables (contains sensitive data)
-.env*
+.env.local
+.env.production.local
 !.env.example
 
 # firebase
