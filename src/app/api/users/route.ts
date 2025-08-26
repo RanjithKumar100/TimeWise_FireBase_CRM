@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongodb';
 import User from '@/lib/models/User';
 import AuditLog from '@/lib/models/AuditLog';
 import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import emailService from '@/lib/email';
 
 // GET /api/users - Get all users (Admin only)
 export async function GET(request: NextRequest) {
@@ -118,6 +119,37 @@ export async function POST(request: NextRequest) {
     });
 
     await user.save();
+
+    // Send welcome email with credentials (async, don't wait for it)
+    if (emailService.isEmailConfigured()) {
+      try {
+        console.log(`📧 Sending welcome email to ${user.email} (${user.role}) - Created by Admin`);
+        const welcomeEmail = emailService.generateWelcomeEmail(
+          user.name, 
+          user.email, 
+          password, // Send the original plain password
+          user.role as 'Admin' | 'User'
+        );
+        
+        const emailSent = await emailService.sendEmail({
+          to: user.email,
+          subject: welcomeEmail.subject,
+          html: welcomeEmail.html,
+          text: welcomeEmail.text
+        });
+        
+        if (emailSent) {
+          console.log(`✅ Welcome email sent successfully to ${user.email}`);
+        } else {
+          console.log(`⚠️ Failed to send welcome email to ${user.email}`);
+        }
+      } catch (emailError) {
+        console.error(`❌ Error sending welcome email to ${user.email}:`, emailError);
+        // Don't fail the user creation if email fails
+      }
+    } else {
+      console.log('📧 Email service not configured, skipping welcome email');
+    }
 
     // Create audit log
     await AuditLog.createLog({

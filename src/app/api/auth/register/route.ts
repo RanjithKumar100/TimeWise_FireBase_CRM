@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import User from '@/lib/models/User';
 import { generateToken, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import emailService from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,12 +24,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { name: { $regex: new RegExp(`^${name}$`, 'i') } }],
-    });
+    const existingUserByEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingUserByEmail) {
+      return createErrorResponse('User with this email already exists', 409);
+    }
 
-    if (existingUser) {
-      return createErrorResponse('User with this email or name already exists', 409);
+    const existingUserByName = await User.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+    if (existingUserByName) {
+      return createErrorResponse('User with this name already exists', 409);
     }
 
     // Create new user
@@ -41,6 +44,37 @@ export async function POST(request: NextRequest) {
     });
 
     await user.save();
+    
+    // Send welcome email with credentials (async, don't wait for it)
+    if (emailService.isEmailConfigured()) {
+      try {
+        console.log(`📧 Sending welcome email to ${user.email} (${user.role})`);
+        const welcomeEmail = emailService.generateWelcomeEmail(
+          user.name, 
+          user.email, 
+          password, // Send the original plain password
+          user.role as 'Admin' | 'User'
+        );
+        
+        const emailSent = await emailService.sendEmail({
+          to: user.email,
+          subject: welcomeEmail.subject,
+          html: welcomeEmail.html,
+          text: welcomeEmail.text
+        });
+        
+        if (emailSent) {
+          console.log(`✅ Welcome email sent successfully to ${user.email}`);
+        } else {
+          console.log(`⚠️ Failed to send welcome email to ${user.email}`);
+        }
+      } catch (emailError) {
+        console.error(`❌ Error sending welcome email to ${user.email}:`, emailError);
+        // Don't fail the registration if email fails
+      }
+    } else {
+      console.log('📧 Email service not configured, skipping welcome email');
+    }
 
     // Generate JWT token
     const tokenPayload = {

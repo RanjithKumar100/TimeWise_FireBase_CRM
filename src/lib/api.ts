@@ -2,7 +2,6 @@
 function getApiBaseUrl(): string {
   // First, check environment variable
   if (process.env.NEXT_PUBLIC_API_URL) {
-    console.log('🔧 Using NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
@@ -13,16 +12,12 @@ function getApiBaseUrl(): string {
     
     // If accessing via IP or network address, use the same for API
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      const apiUrl = `${protocol}//${hostname}:9002`;
-      console.log('🔧 Auto-detected API URL:', apiUrl);
-      return apiUrl;
+      return `${protocol}//${hostname}:9002`;
     }
   }
   
   // Fallback to localhost for development
-  const fallbackUrl = 'http://localhost:9002';
-  console.log('🔧 Using fallback API URL:', fallbackUrl);
-  return fallbackUrl;
+  return 'http://localhost:9002';
 }
 
 const API_BASE_URL = getApiBaseUrl();
@@ -91,13 +86,6 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    console.log('🌐 API Request:', {
-      method: options.method || 'GET',
-      url,
-      hasAuth: !!this.token,
-      timestamp: new Date().toISOString()
-    });
-
     try {
       const response = await fetch(url, {
         ...options,
@@ -144,22 +132,9 @@ class ApiClient {
 
   // Authentication methods
   async login(username: string, password: string) {
-    console.log('🔐 Login attempt:', {
-      username,
-      apiUrl: this.getBaseUrl(),
-      timestamp: new Date().toISOString()
-    });
-    
     const response = await this.request<{ user: any }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
-    });
-
-    console.log('🔐 Login response:', {
-      success: response.success,
-      hasToken: !!response.token,
-      message: response.message,
-      timestamp: new Date().toISOString()
     });
 
     if (response.success && response.token) {

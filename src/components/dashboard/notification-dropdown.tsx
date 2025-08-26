@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Bell, Calendar, Clock } from 'lucide-react';
-import { format, subDays, isWeekend } from 'date-fns';
+import React from 'react';
+import { Bell, Calendar, Clock, X, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,84 +14,18 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
-import { apiClient } from '@/lib/api';
-
-interface MissingLogDate {
-  date: string;
-  formattedDate: string;
-  daysAgo: number;
-}
+import { useNotifications } from '@/hooks/use-notifications';
 
 export function NotificationDropdown() {
   const { user } = useAuth();
-  const [missingDates, setMissingDates] = useState<MissingLogDate[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (user) {
-      checkMissingLogs();
-    }
-  }, [user]);
-
-  const checkMissingLogs = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      
-      // Get work logs for the last 30 days
-      const endDate = new Date();
-      const startDate = subDays(endDate, 30);
-      
-      const response = await apiClient.getWorkLogs({
-        startDate: format(startDate, 'yyyy-MM-dd'),
-        endDate: format(endDate, 'yyyy-MM-dd'),
-      });
-
-      if (response.success && response.data) {
-        const userLogs = response.data.workLogs.filter(log => 
-          user.role === 'Admin' ? true : log.userId === user.id
-        );
-
-        // Create a set of dates that have logs
-        const loggedDates = new Set(
-          userLogs.map(log => format(new Date(log.date), 'yyyy-MM-dd'))
-        );
-
-        // Check last 14 days (excluding weekends) for missing logs
-        const missing: MissingLogDate[] = [];
-        for (let i = 1; i <= 14; i++) {
-          const checkDate = subDays(new Date(), i);
-          const dateString = format(checkDate, 'yyyy-MM-dd');
-          
-          // Skip weekends
-          if (isWeekend(checkDate)) continue;
-          
-          // Skip if log exists
-          if (loggedDates.has(dateString)) continue;
-          
-          missing.push({
-            date: dateString,
-            formattedDate: format(checkDate, 'MMM dd, yyyy'),
-            daysAgo: i,
-          });
-        }
-
-        setMissingDates(missing);
-      }
-    } catch (error) {
-      console.error('Error checking missing logs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkAsNotified = (date: string) => {
-    // Remove from notifications (in a real app, you might want to store this server-side)
-    setMissingDates(prev => prev.filter(d => d.date !== date));
-  };
-
-  const notificationCount = missingDates.length;
+  const { 
+    missingDates, 
+    loading, 
+    notificationCount, 
+    dismissNotification, 
+    clearAllNotifications,
+    refreshNotifications 
+  } = useNotifications();
 
   return (
     <DropdownMenu>
@@ -110,12 +43,35 @@ export function NotificationDropdown() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center gap-2 sticky top-0 bg-background border-b pb-2">
-          <Bell className="h-4 w-4" />
-          Timesheet Reminders
-          {notificationCount > 0 && (
-            <Badge variant="secondary">{notificationCount}</Badge>
-          )}
+        <DropdownMenuLabel className="flex items-center justify-between sticky top-0 bg-background border-b pb-2">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Timesheet Reminders
+            {notificationCount > 0 && (
+              <Badge variant="secondary">{notificationCount}</Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshNotifications}
+              className="h-6 px-2 text-xs hover:bg-muted"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+            {notificationCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllNotifications}
+                className="h-6 px-2 text-xs hover:bg-muted"
+              >
+                Clear All
+              </Button>
+            )}
+          </div>
         </DropdownMenuLabel>
         
         <ScrollArea className="max-h-80">
@@ -158,9 +114,10 @@ export function NotificationDropdown() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleMarkAsNotified(missing.date)}
-                        className="text-xs h-6 px-2 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => dismissNotification(missing.date)}
+                        className="text-xs h-6 px-2 hover:bg-destructive hover:text-destructive-foreground flex items-center gap-1"
                       >
+                        <X className="h-3 w-3" />
                         Dismiss
                       </Button>
                     </div>
