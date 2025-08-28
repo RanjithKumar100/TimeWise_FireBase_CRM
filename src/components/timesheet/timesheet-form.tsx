@@ -26,7 +26,14 @@ const formSchema = z.object({
   verticle: z.enum(verticles, { required_error: 'Please select a verticle.' }),
   country: z.string().min(2, 'Country must be at least 2 characters.'),
   task: z.string().min(3, 'Task description is required.'),
-  hours: z.coerce.number().min(0.5, 'Minimum hours is 0.5.').max(24, 'Maximum hours is 24.'),
+  hours: z.coerce.number().min(0, 'Hours cannot be negative.').max(23, 'Hours cannot exceed 23.'),
+  minutes: z.coerce.number().min(0, 'Minutes cannot be negative.').max(59, 'Minutes cannot exceed 59.'),
+}).refine((data) => {
+  const totalMinutes = (data.hours * 60) + data.minutes;
+  return totalMinutes >= 30 && totalMinutes <= (24 * 60); // At least 30 minutes, max 24 hours
+}, {
+  message: 'Total time must be between 30 minutes and 24 hours',
+  path: ['hours'] // Show error on hours field
 });
 
 type TimesheetFormValues = z.infer<typeof formSchema>;
@@ -49,7 +56,8 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
       verticle: editingEntry?.verticle,
       country: editingEntry?.country || '',
       task: editingEntry?.task || '',
-      hours: editingEntry?.hours || 8,
+      hours: editingEntry ? Math.floor(editingEntry.hours) : 8,
+      minutes: editingEntry ? Math.round((editingEntry.hours - Math.floor(editingEntry.hours)) * 60) : 0,
     },
   });
 
@@ -60,7 +68,8 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
         verticle: editingEntry.verticle,
         country: editingEntry.country,
         task: editingEntry.task,
-        hours: editingEntry.hours,
+        hours: Math.floor(editingEntry.hours),
+        minutes: Math.round((editingEntry.hours - Math.floor(editingEntry.hours)) * 60),
       });
     }
   }, [editingEntry, form]);
@@ -82,7 +91,14 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
       }
     }
 
-    onSave(data);
+    // Convert hours and minutes to decimal hours
+    const totalHours = data.hours + (data.minutes / 60);
+    const convertedData = {
+      ...data,
+      hours: totalHours
+    };
+
+    onSave(convertedData);
     if (!editingEntry) {
       form.reset();
     }
@@ -206,19 +222,51 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="hours"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Hours Spent</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.5" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Time Spent Section */}
+            <div className="space-y-4">
+              <FormLabel>Time Spent</FormLabel>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="hours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Hours</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0"
+                          max="23"
+                          {...field}
+                          placeholder="0-23"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="minutes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Minutes</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0"
+                          max="59"
+                          step="1"
+                          {...field}
+                          placeholder="0-59"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
           </CardContent>
           <CardFooter className="flex justify-end">
             <div className="flex gap-2">

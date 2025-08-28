@@ -18,6 +18,8 @@ import TimesheetTableWithPermissions from '@/components/timesheet/timesheet-tabl
 import CalendarView from '@/components/timesheet/calendar-view';
 import IndividualSummary from '@/components/reports/individual-summary';
 import StatsCard from '@/components/dashboard/stats-card';
+import { ConditionalDataLoader } from '@/components/ui/database-status';
+import { formatDateForAPI } from '@/lib/date-utils';
 
 interface WorkLogEntry {
   id: string;
@@ -146,7 +148,7 @@ export default function UserDashboardPage() {
             'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
           },
           body: JSON.stringify({
-            date: newEntry.date.toISOString().split('T')[0],
+            date: formatDateForAPI(newEntry.date),
             verticle: newEntry.verticle,
             country: newEntry.country,
             task: newEntry.task,
@@ -186,7 +188,7 @@ export default function UserDashboardPage() {
             'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
           },
           body: JSON.stringify({
-            date: newEntry.date.toISOString().split('T')[0],
+            date: formatDateForAPI(newEntry.date),
             verticle: newEntry.verticle,
             country: newEntry.country,
             task: newEntry.task,
@@ -290,7 +292,8 @@ export default function UserDashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <ConditionalDataLoader>
+      <div className="flex flex-col gap-6">
       {/* User Role Badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -381,6 +384,7 @@ export default function UserDashboardPage() {
           <IndividualSummary entries={workLogs} employees={[currentUser]} />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </ConditionalDataLoader>
   );
 }

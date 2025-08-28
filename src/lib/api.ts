@@ -1,19 +1,26 @@
 // Function to get the correct API base URL
 function getApiBaseUrl(): string {
-  // First, check environment variable
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  
-  // On client side, try to detect the current host
+  // On client side, always use the current host
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     
-    // If accessing via IP or network address, use the same for API
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return `${protocol}//${hostname}:9002`;
+    // For development, use localhost if we're on localhost
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:9002';
     }
+    
+    // If accessing via IP or network address, use the same for API
+    return `${protocol}//${hostname}:9002`;
+  }
+  
+  // Server side: check environment variable first
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    // But avoid using 'timewise' hostname which might not resolve
+    if (process.env.NEXT_PUBLIC_API_URL.includes('timewise')) {
+      return 'http://localhost:9002';
+    }
+    return process.env.NEXT_PUBLIC_API_URL;
   }
   
   // Fallback to localhost for development
@@ -77,6 +84,12 @@ class ApiClient {
   ): Promise<ApiResponse<T>> {
     const url = `${this.getBaseUrl()}/api${endpoint}`;
     
+    console.log('🌐 API Request:', {
+      method: options.method || 'GET',
+      url,
+      baseUrl: this.getBaseUrl()
+    });
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -94,7 +107,24 @@ class ApiClient {
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
-      const data: ApiResponse<T> = await response.json();
+      let data: ApiResponse<T>;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Failed to parse JSON response:', jsonError);
+        throw new ApiError('Invalid JSON response from server', response.status, {
+          success: false,
+          message: 'Invalid JSON response from server',
+          data: null
+        });
+      }
+
+      console.log('📡 API Response:', {
+        status: response.status,
+        ok: response.ok,
+        success: data.success,
+        message: data.message
+      });
 
       if (!response.ok) {
         throw new ApiError(data.message || 'Request failed', response.status, data);
@@ -103,6 +133,7 @@ class ApiClient {
       return data;
     } catch (error: any) {
       if (error instanceof ApiError) {
+        console.error('🚫 API Error:', error.message, 'Status:', error.statusCode);
         throw error;
       }
       
@@ -111,14 +142,17 @@ class ApiClient {
       
       if (error.name === 'AbortError') {
         errorMessage = 'Request timeout - server may be slow or unavailable';
-      } else if (error.code === 'ECONNREFUSED' || error.message.includes('fetch')) {
-        errorMessage = `Cannot connect to server at ${url}. Make sure the server is running on port 9002.`;
+      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = `Cannot connect to server at ${url}. Server may be down or unreachable.`;
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = `Connection refused to ${url}. Make sure the server is running on port 9002.`;
       }
       
-      console.error('API Request Failed:', {
+      console.error('❌ Network/Request Error:', {
         url,
         error: error.message,
-        type: error.name
+        type: error.name,
+        code: error.code
       });
       
       // Network or other errors
@@ -163,6 +197,26 @@ class ApiClient {
 
   logout() {
     this.setToken(null);
+  }
+
+  async forgotPassword(email: string) {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async validateResetToken(token: string) {
+    return this.request(`/auth/reset-password?token=${token}`, {
+      method: 'GET',
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
   }
 
   // Work logs methods

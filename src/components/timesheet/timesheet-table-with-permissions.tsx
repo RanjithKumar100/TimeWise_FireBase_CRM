@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Edit2, Trash2, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Edit2, Trash2, Clock, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,8 +32,10 @@ export default function TimesheetTableWithPermissions({
 }: TimesheetTableProps) {
   const { user, isAdmin } = useAuth();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const entriesPerPage = 10; // Show 10 entries per page
 
-  const filteredEntries = useMemo(() => {
+  const allFilteredEntries = useMemo(() => {
     if (!user) return [];
     
     if (showAllUsers && isAdmin()) {
@@ -42,6 +44,16 @@ export default function TimesheetTableWithPermissions({
     
     return filterTimesheetEntriesForUser(entries, user);
   }, [entries, user, showAllUsers, isAdmin]);
+
+  const totalPages = Math.ceil(allFilteredEntries.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = startIndex + entriesPerPage;
+  const paginatedEntries = allFilteredEntries.slice(startIndex, endIndex);
+
+  // Reset to page 1 when entries change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [allFilteredEntries.length]);
 
   const getEmployeeName = (employeeId: string) => {
     const employee = employees.find(emp => emp.id === employeeId);
@@ -145,7 +157,7 @@ export default function TimesheetTableWithPermissions({
     return permissions?.canDelete || false;
   };
 
-  if (filteredEntries.length === 0) {
+  if (allFilteredEntries.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -168,7 +180,7 @@ export default function TimesheetTableWithPermissions({
         <CardTitle className="flex items-center justify-between">
           Time Entries
           <Badge variant="outline">
-            {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}
+            {allFilteredEntries.length} {allFilteredEntries.length === 1 ? 'entry' : 'entries'}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -188,7 +200,7 @@ export default function TimesheetTableWithPermissions({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEntries.map((entry) => (
+              {paginatedEntries.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="font-medium">
                     {format(entry.date, 'MMM dd, yyyy')}
@@ -236,41 +248,44 @@ export default function TimesheetTableWithPermissions({
                         </Button>
                       )}
                       
-                      <AlertDialog 
-                        open={deleteConfirmId === entry.id} 
-                        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
-                      >
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteConfirmId(entry.id)}
-                            disabled={!canUserDelete(entry) || entry.status === 'rejected'}
-                            className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                            title={entry.status === 'rejected' ? 'Already rejected' : 'Reject entry'}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Reject Time Entry</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to reject this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
-                              The user will see this entry as rejected in their dashboard.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(entry.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      {/* Only show delete button in admin view (when showAllUsers is true) */}
+                      {showAllUsers && (
+                        <AlertDialog 
+                          open={deleteConfirmId === entry.id} 
+                          onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+                        >
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeleteConfirmId(entry.id)}
+                              disabled={!canUserDelete(entry) || entry.status === 'rejected'}
+                              className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                              title={entry.status === 'rejected' ? 'Already rejected' : 'Reject entry'}
                             >
-                              Reject Entry
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reject Time Entry</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to reject this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
+                                The user will see this entry as rejected in their dashboard.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(entry.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Reject Entry
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -278,6 +293,38 @@ export default function TimesheetTableWithPermissions({
             </TableBody>
           </Table>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, allFilteredEntries.length)} of {allFilteredEntries.length} entries
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="h-8 w-8 p-0"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-sm font-medium">
+                Page {currentPage} of {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="h-8 w-8 p-0"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

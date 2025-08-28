@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongodb';
 import WorkLog from '@/lib/models/WorkLog';
 import User from '@/lib/models/User';
 import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { convertHoursInput } from '@/lib/time-utils';
 
 // GET /api/worklogs - Get work logs (filtered by user role)
 export async function GET(request: NextRequest) {
@@ -130,7 +131,15 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Invalid verticle specified', 400);
     }
 
-    if (hoursSpent < 0.5 || hoursSpent > 24) {
+    // Convert hours using the time conversion logic
+    let convertedHours;
+    try {
+      convertedHours = convertHoursInput(hoursSpent);
+    } catch (error: any) {
+      return createErrorResponse(error.message, 400);
+    }
+
+    if (convertedHours < 0.5 || convertedHours > 24) {
       return createErrorResponse('Hours must be between 0.5 and 24', 400);
     }
 
@@ -154,8 +163,8 @@ export async function POST(request: NextRequest) {
 
     const totalHoursForDay = existingLogs.reduce((sum, log) => sum + log.hoursSpent, 0);
     
-    if (totalHoursForDay + hoursSpent > 24) {
-      return createErrorResponse(`Cannot exceed 24 hours per day. Current total: ${totalHoursForDay} hours. Attempting to add: ${hoursSpent} hours.`, 400);
+    if (totalHoursForDay + convertedHours > 24) {
+      return createErrorResponse(`Cannot exceed 24 hours per day. Current total: ${totalHoursForDay} hours. Attempting to add: ${convertedHours} hours.`, 400);
     }
 
     // Create new work log
@@ -165,7 +174,7 @@ export async function POST(request: NextRequest) {
       verticle,
       country: country.trim(),
       task: task.trim(),
-      hoursSpent: parseFloat(hoursSpent.toString()),
+      hoursSpent: convertedHours,
     });
 
     await workLog.save();

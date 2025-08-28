@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Clock, Hourglass, BarChart, Users, Shield, AlertTriangle, Download, Filter, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
+import { formatDateForAPI } from '@/lib/date-utils';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +25,7 @@ import StatsCard from '@/components/dashboard/stats-card';
 import ManageUsers from '@/components/admin/manage-users';
 import TimesheetForm from '@/components/timesheet/timesheet-form';
 import NotificationManagement from '@/components/admin/notification-management';
+import { ConditionalDataLoader } from '@/components/ui/database-status';
 
 interface WorkLogEntry {
   id: string;
@@ -250,7 +252,7 @@ export default function AdminDashboardPage() {
             'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
           },
           body: JSON.stringify({
-            date: newEntry.date.toISOString().split('T')[0],
+            date: formatDateForAPI(newEntry.date),
             verticle: newEntry.verticle,
             country: newEntry.country,
             task: newEntry.task,
@@ -290,7 +292,7 @@ export default function AdminDashboardPage() {
             'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
           },
           body: JSON.stringify({
-            date: newEntry.date.toISOString().split('T')[0],
+            date: formatDateForAPI(newEntry.date),
             verticle: newEntry.verticle,
             country: newEntry.country,
             task: newEntry.task,
@@ -417,7 +419,8 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <ConditionalDataLoader>
+      <div className="flex flex-col gap-6">
       {/* Admin Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -579,6 +582,7 @@ export default function AdminDashboardPage() {
             <NotificationManagement />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </ConditionalDataLoader>
   );
 }

@@ -405,6 +405,132 @@ TimeWise System - Internal Timesheet Management
 
     return { subject, html, text };
   }
+
+  generatePasswordResetEmail(userName: string, resetUrl: string, expiresAt: Date): { subject: string; html: string; text: string } {
+    const expiryTime = expiresAt.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      timeZoneName: 'short'
+    });
+    const expiryDate = expiresAt.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const subject = '🔒 TimeWise Password Reset Request';
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Password Reset</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #dc2626; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border-radius: 0 0 8px 8px; }
+          .alert { background: #fef3cd; border: 1px solid #facc15; padding: 15px; border-radius: 6px; margin: 20px 0; }
+          .security-warning { background: #fef2f2; border: 1px solid #dc2626; padding: 15px; border-radius: 6px; margin: 20px 0; }
+          .button { display: inline-block; background: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+          .button:hover { background: #b91c1c; }
+          .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 14px; }
+          .code-block { background: #f3f4f6; padding: 15px; border-radius: 6px; font-family: monospace; word-break: break-all; margin: 15px 0; }
+          .urgency { color: #dc2626; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔒 Password Reset Request</h1>
+            <p>TimeWise Account Security</p>
+          </div>
+          
+          <div class="content">
+            <h2>Hello ${userName},</h2>
+            
+            <p>We received a request to reset the password for your TimeWise account. If you made this request, click the button below to reset your password.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetUrl}" class="button">
+                🔑 Reset My Password
+              </a>
+            </div>
+            
+            <div class="alert">
+              <p><strong>⏰ This link expires on:</strong></p>
+              <p class="urgency">${expiryDate} at ${expiryTime}</p>
+              <p>You have <strong>1 hour</strong> from the time this email was sent to use this link.</p>
+            </div>
+            
+            <h3>🛡️ Security Information:</h3>
+            <ul>
+              <li><strong>One-time use:</strong> This link can only be used once</li>
+              <li><strong>Secure:</strong> The link contains a unique, encrypted token</li>
+              <li><strong>Time-limited:</strong> Link automatically expires after 1 hour</li>
+              <li><strong>Account protection:</strong> Previous reset requests are invalidated</li>
+            </ul>
+            
+            <div class="security-warning">
+              <h3>⚠️ Didn't request this reset?</h3>
+              <p>If you did not request a password reset, please ignore this email. Your account remains secure and no changes will be made.</p>
+              <p><strong>Consider:</strong></p>
+              <ul>
+                <li>Reviewing your account security settings</li>
+                <li>Checking for any suspicious activity</li>
+                <li>Contacting your administrator if you have concerns</li>
+              </ul>
+            </div>
+            
+            <h3>🔗 Can't click the button?</h3>
+            <p>Copy and paste this link into your browser:</p>
+            <div class="code-block">${resetUrl}</div>
+            
+            <h3>📞 Need Help?</h3>
+            <p>If you're having trouble resetting your password or have security concerns, please contact your system administrator.</p>
+            
+            <div class="footer">
+              <p><strong>Important:</strong> This email contains a secure password reset link. Keep it confidential.</p>
+              <p><strong>TimeWise System</strong> - Internal Timesheet Management</p>
+              <p><small>© ${new Date().getFullYear()} TimeWise - This is a system-generated security email</small></p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+TimeWise Password Reset Request
+
+Hello ${userName},
+
+We received a request to reset the password for your TimeWise account.
+
+To reset your password, visit this link:
+${resetUrl}
+
+IMPORTANT DETAILS:
+- This link expires on ${expiryDate} at ${expiryTime}
+- You have 1 hour from when this email was sent
+- This link can only be used once
+- Previous reset requests are now invalidated
+
+SECURITY NOTICE:
+If you did not request this password reset, please ignore this email. Your account remains secure and no changes will be made.
+
+If you can't click the link, copy and paste this URL into your browser:
+${resetUrl}
+
+Need help? Contact your system administrator.
+
+TimeWise System - Internal Timesheet Management
+This is a system-generated security email.
+    `;
+
+    return { subject, html, text };
+  }
 }
 
 export const emailService = new EmailService();

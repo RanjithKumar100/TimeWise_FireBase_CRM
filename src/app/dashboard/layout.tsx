@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationDropdown } from '@/components/dashboard/notification-dropdown';
+import { RealTimeClock, MinimalClock } from '@/components/dashboard/real-time-clock';
+import { DatabaseStatusIndicator } from '@/components/ui/database-status';
 
 
 export default function DashboardLayout({
@@ -98,7 +100,15 @@ export default function DashboardLayout({
             <div className="flex-1">
               {/* Optional: Add search or other header content here */}
             </div>
-            <NotificationDropdown />
+            <div className="flex items-center gap-4">
+              {/* Database status indicator */}
+              <DatabaseStatusIndicator className="hidden md:flex" />
+              {/* Full clock for desktop */}
+              <RealTimeClock className="hidden lg:flex" />
+              {/* Minimal clock for tablets */}
+              <MinimalClock className="hidden sm:flex lg:hidden" />
+              <NotificationDropdown />
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">

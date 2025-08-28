@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongodb';
 import WorkLog from '@/lib/models/WorkLog';
 import User from '@/lib/models/User';
 import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { convertHoursInput } from '@/lib/time-utils';
 
 // GET /api/worklogs/[id] - Get specific work log
 export async function GET(
@@ -105,8 +106,14 @@ export async function PUT(
     if (country) workLog.country = country.trim();
     if (task) workLog.task = task.trim();
     if (hoursSpent !== undefined) {
-      const hours = parseFloat(hoursSpent.toString());
-      if (hours < 0.5 || hours > 24) {
+      let convertedHours;
+      try {
+        convertedHours = convertHoursInput(parseFloat(hoursSpent.toString()));
+      } catch (error: any) {
+        return createErrorResponse(error.message, 400);
+      }
+      
+      if (convertedHours < 0.5 || convertedHours > 24) {
         return createErrorResponse('Hours must be between 0.5 and 24', 400);
       }
 
@@ -125,11 +132,11 @@ export async function PUT(
 
       const totalHoursForDay = existingLogs.reduce((sum, log) => sum + log.hoursSpent, 0);
       
-      if (totalHoursForDay + hours > 24) {
-        return createErrorResponse(`Cannot exceed 24 hours per day. Current total (excluding this entry): ${totalHoursForDay} hours. Attempting to set: ${hours} hours.`, 400);
+      if (totalHoursForDay + convertedHours > 24) {
+        return createErrorResponse(`Cannot exceed 24 hours per day. Current total (excluding this entry): ${totalHoursForDay} hours. Attempting to set: ${convertedHours} hours.`, 400);
       }
 
-      workLog.hoursSpent = hours;
+      workLog.hoursSpent = convertedHours;
     }
 
     workLog.updatedAt = new Date();
