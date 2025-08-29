@@ -22,8 +22,11 @@ export async function GET(request: NextRequest) {
 
     let query: any = {};
     
-    // Users can only see their own work logs, Admins can see all
-    if (authUser.role !== 'Admin') {
+    // Check if personal-only mode is requested
+    const personalOnly = searchParams.get('personalOnly') === 'true';
+    
+    // Users can only see their own work logs, Admins can see all (unless personalOnly is requested)
+    if (authUser.role !== 'Admin' || personalOnly) {
       query.userId = authUser.userId;
     }
 
@@ -50,8 +53,8 @@ export async function GET(request: NextRequest) {
 
     console.log('Fetched work logs sample:', workLogs.length > 0 ? {
       id: workLogs[0].logId,
-      status: workLogs[0].status,
-      rejectedAt: workLogs[0].rejectedAt
+      date: workLogs[0].date,
+      userId: workLogs[0].userId
     } : 'No logs found');
 
     // Get user information for each work log
@@ -79,9 +82,6 @@ export async function GET(request: NextRequest) {
         country: log.country,
         task: log.task,
         hours: log.hoursSpent,
-        status: log.status || 'approved',
-        rejectedAt: log.rejectedAt,
-        rejectedBy: log.rejectedBy,
         employeeId: log.userId,
         employeeName: user?.name || 'Unknown',
         employeeEmail: user?.email || '',
@@ -148,6 +148,12 @@ export async function POST(request: NextRequest) {
     const validation = WorkLog.validateSixDayWindow(recordDate, authUser.role);
     if (!validation.isValid) {
       return createErrorResponse(validation.message || 'Invalid date', 400);
+    }
+
+    // Validate that the date is not a leave day
+    const leaveValidation = await WorkLog.validateLeaveDay(recordDate, authUser.role);
+    if (!leaveValidation.isValid) {
+      return createErrorResponse(leaveValidation.message || 'Cannot create entries on leave days', 400);
     }
 
     // Check daily 24-hour limit

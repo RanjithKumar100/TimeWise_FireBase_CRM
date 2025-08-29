@@ -2,6 +2,7 @@ import dbConnect from './mongodb';
 import User from './models/User';
 import WorkLog from './models/WorkLog';
 import NotificationLog from './models/NotificationLog';
+import Leave from './models/Leave';
 import { emailService } from './email';
 
 interface MissingEntryInfo {
@@ -27,16 +28,24 @@ interface NotificationResult {
 class NotificationService {
   
   /**
-   * Get all business days between two dates (excluding weekends)
+   * Get all business days between two dates (excluding weekends and leave dates)
    */
-  private getBusinessDays(startDate: Date, endDate: Date): Date[] {
+  private async getBusinessDays(startDate: Date, endDate: Date): Promise<Date[]> {
     const businessDays: Date[] = [];
     const current = new Date(startDate);
     
+    // Get all leave dates in the range
+    const leaveDates = await Leave.getLeaveDatesInRange(startDate, endDate);
+    const leaveDateStrings = new Set(
+      leaveDates.map(date => date.toISOString().split('T')[0])
+    );
+    
     while (current <= endDate) {
       const dayOfWeek = current.getDay();
-      // 0 = Sunday, 6 = Saturday, so exclude weekends
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      const dateString = current.toISOString().split('T')[0];
+      
+      // 0 = Sunday, 6 = Saturday, so exclude weekends and leave dates
+      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !leaveDateStrings.has(dateString)) {
         businessDays.push(new Date(current));
       }
       current.setDate(current.getDate() + 1);
@@ -80,8 +89,8 @@ class NotificationService {
       yesterday.setDate(today.getDate() - 1);
 
       for (const user of users) {
-        // Get business days in the last 6 days
-        const businessDays = this.getBusinessDays(sixDaysAgo, today);
+        // Get business days in the last 6 days (excluding leave dates)
+        const businessDays = await this.getBusinessDays(sixDaysAgo, today);
         
         // Get existing work logs for this user in the date range
         const existingLogs = await WorkLog.find({
@@ -101,9 +110,10 @@ class NotificationService {
         const missingDates: Date[] = [];
         const yesterdayString = yesterday.toISOString().split('T')[0];
         const isYesterdayBusinessDay = yesterday.getDay() !== 0 && yesterday.getDay() !== 6;
+        const isYesterdayLeave = await Leave.isLeaveDay(yesterday);
         
         // First check if yesterday is missing (priority check)
-        if (isYesterdayBusinessDay && !loggedDates.has(yesterdayString)) {
+        if (isYesterdayBusinessDay && !isYesterdayLeave && !loggedDates.has(yesterdayString)) {
           const daysRemaining = this.calculateDaysRemaining(yesterday);
           if (daysRemaining > 0) {
             missingDates.push(yesterday);

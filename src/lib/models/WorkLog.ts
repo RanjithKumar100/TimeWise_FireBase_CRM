@@ -1,4 +1,5 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
+import Leave from './Leave';
 
 export interface IWorkLog extends Document {
   logId: string;
@@ -8,12 +9,14 @@ export interface IWorkLog extends Document {
   country: string;
   task: string;
   hoursSpent: number;
-  status: 'approved' | 'rejected';
-  rejectedAt?: Date;
-  rejectedBy?: string;
   createdAt: Date;
   updatedAt: Date;
   canEdit(currentUserId: string, currentUserRole: string): boolean;
+}
+
+export interface IWorkLogModel extends Model<IWorkLog> {
+  validateSixDayWindow(recordDate: Date, userRole: string): { isValid: boolean; message?: string };
+  validateLeaveDay(recordDate: Date, userRole: string): Promise<{ isValid: boolean; message?: string }>;
 }
 
 const WorkLogSchema: Schema = new Schema(
@@ -59,17 +62,6 @@ const WorkLogSchema: Schema = new Schema(
       min: [0.5, 'Minimum hours is 0.5'],
       max: [24, 'Maximum hours per entry is 24'],
     },
-    status: {
-      type: String,
-      enum: ['approved', 'rejected'],
-      default: 'approved',
-    },
-    rejectedAt: {
-      type: Date,
-    },
-    rejectedBy: {
-      type: String,
-    },
   },
   {
     timestamps: true,
@@ -105,6 +97,25 @@ WorkLogSchema.statics.validateSixDayWindow = function (recordDate: Date, userRol
     return {
       isValid: false,
       message: 'You cannot create entries for future dates.'
+    };
+  }
+  
+  return { isValid: true };
+};
+
+// Helper function to validate that the date is not a leave day
+WorkLogSchema.statics.validateLeaveDay = async function (recordDate: Date, userRole: string): Promise<{ isValid: boolean; message?: string }> {
+  // Admin can create entries even on leave days (override capability)
+  if (userRole === 'Admin') {
+    return { isValid: true };
+  }
+  
+  // Check if the date is a declared leave day
+  const isLeave = await Leave.isLeaveDay(recordDate);
+  if (isLeave) {
+    return {
+      isValid: false,
+      message: 'Cannot create timesheet entries on company leave days. Contact admin if this entry is required.'
     };
   }
   
@@ -152,4 +163,4 @@ WorkLogSchema.virtual('editTimeRemaining').get(function () {
 // Ensure virtual fields are serialized
 WorkLogSchema.set('toJSON', { virtuals: true });
 
-export default mongoose.models.WorkLog || mongoose.model<IWorkLog>('WorkLog', WorkLogSchema);
+export default (mongoose.models.WorkLog as IWorkLogModel) || mongoose.model<IWorkLog, IWorkLogModel>('WorkLog', WorkLogSchema);

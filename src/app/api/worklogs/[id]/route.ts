@@ -93,6 +93,13 @@ export async function PUT(
       if (!validation.isValid) {
         return createErrorResponse(validation.message || 'Invalid date', 400);
       }
+
+      // Validate that the new date is not a leave day
+      const leaveValidation = await WorkLog.validateLeaveDay(newDate, authUser.role);
+      if (!leaveValidation.isValid) {
+        return createErrorResponse(leaveValidation.message || 'Cannot create entries on leave days', 400);
+      }
+
       workLog.date = newDate;
     }
 
@@ -198,21 +205,19 @@ export async function DELETE(
       return createErrorResponse('Work log not found', 404);
     }
 
-    // Mark as rejected instead of deleting
-    workLog.status = 'rejected';
-    workLog.rejectedAt = new Date();
-    workLog.rejectedBy = authUser.userId;
-    workLog.updatedAt = new Date();
+    // Delete the entry instead of marking as rejected
+    const deletedLog = await WorkLog.findOneAndDelete({ logId: params.id });
     
-    const savedLog = await workLog.save();
-    console.log('Work log rejected and saved:', {
-      id: savedLog.logId,
-      status: savedLog.status,
-      rejectedAt: savedLog.rejectedAt,
-      rejectedBy: savedLog.rejectedBy
+    console.log('Work log deleted by admin:', {
+      id: deletedLog.logId,
+      userId: deletedLog.userId,
+      date: deletedLog.date,
+      hours: deletedLog.hoursSpent,
+      deletedBy: authUser.userId,
+      deletedAt: new Date()
     });
 
-    return createSuccessResponse('Work log rejected successfully');
+    return createSuccessResponse('Work log deleted successfully');
   } catch (error) {
     console.error('Reject work log error:', error);
     return createErrorResponse('Internal server error', 500);

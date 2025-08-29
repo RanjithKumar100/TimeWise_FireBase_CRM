@@ -26,6 +26,7 @@ import StatsCard from '@/components/dashboard/stats-card';
 import ManageUsers from '@/components/admin/manage-users';
 import TimesheetForm from '@/components/timesheet/timesheet-form';
 import NotificationManagement from '@/components/admin/notification-management';
+import LeaveManagement from '@/components/admin/leave-management';
 import { ConditionalDataLoader } from '@/components/ui/database-status';
 
 interface WorkLogEntry {
@@ -35,9 +36,6 @@ interface WorkLogEntry {
   country: string;
   task: string;
   hours: number;
-  status?: 'approved' | 'rejected';
-  rejectedAt?: Date;
-  rejectedBy?: string;
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
@@ -55,6 +53,7 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<Employee[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
   const [allWorkLogs, setAllWorkLogs] = useState<WorkLogEntry[]>([]);
+  const [adminEntries, setAdminEntries] = useState<WorkLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<WorkLogEntry | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -112,11 +111,15 @@ export default function AdminDashboardPage() {
         date: new Date(log.date),
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
-        status: log.status || 'approved',
-        rejectedAt: log.rejectedAt ? new Date(log.rejectedAt) : undefined,
       }));
       setAllWorkLogs(logs);
       setWorkLogs(logs);
+      
+      // Filter admin's own entries
+      if (user) {
+        const adminLogs = logs.filter((log: WorkLogEntry) => log.employeeId === user.userId);
+        setAdminEntries(adminLogs);
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -173,7 +176,23 @@ export default function AdminDashboardPage() {
     }
 
     setWorkLogs(filtered);
-  }, [selectedMonth, selectedUser, allWorkLogs]);
+
+    // Also filter admin entries for month selection
+    if (user) {
+      let adminFiltered = allWorkLogs.filter((log: WorkLogEntry) => log.employeeId === user.userId);
+      
+      // Filter by month
+      if (selectedMonth !== 'all') {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        adminFiltered = adminFiltered.filter(log => {
+          const logDate = new Date(log.date);
+          return logDate.getFullYear() === year && logDate.getMonth() + 1 === month;
+        });
+      }
+      
+      setAdminEntries(adminFiltered);
+    }
+  }, [selectedMonth, selectedUser, allWorkLogs, user]);
 
   // Export to Excel
   const exportToExcel = () => {
@@ -291,6 +310,20 @@ export default function AdminDashboardPage() {
             log.id === editingEntry.id ? updatedLog : log
           )
         );
+        setAllWorkLogs(prevLogs => 
+          prevLogs.map(log => 
+            log.id === editingEntry.id ? updatedLog : log
+          )
+        );
+        
+        // Update admin entries if this is admin's entry
+        if (user && updatedLog.employeeId === user.userId) {
+          setAdminEntries(prevLogs => 
+            prevLogs.map(log => 
+              log.id === editingEntry.id ? updatedLog : log
+            )
+          );
+        }
         setEditingEntry(null);
 
         toast({
@@ -327,6 +360,12 @@ export default function AdminDashboardPage() {
         };
 
         setWorkLogs(prevLogs => [newLog, ...prevLogs]);
+        setAllWorkLogs(prevLogs => [newLog, ...prevLogs]);
+        
+        // Add to admin entries if this is admin's entry
+        if (user && newLog.employeeId === user.userId) {
+          setAdminEntries(prevLogs => [newLog, ...prevLogs]);
+        }
 
         toast({
           title: "Success",
@@ -358,7 +397,7 @@ export default function AdminDashboardPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to reject work log');
+        throw new Error(errorData.message || 'Failed to delete work log');
       }
 
       // Refresh the work logs to get the updated status from server
@@ -366,13 +405,13 @@ export default function AdminDashboardPage() {
       
       toast({
         title: "Success", 
-        description: "Work log rejected successfully",
+        description: "Work log deleted successfully",
       });
     } catch (error: any) {
-      console.error('Reject work log error:', error);
+      console.error('Delete work log error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to reject work log",
+        description: error.message || "Failed to delete work log",
         variant: "destructive",
       });
     }
@@ -567,11 +606,12 @@ export default function AdminDashboardPage() {
       </div>
 
       <Tabs defaultValue="team-summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="team-summary">Team Summary</TabsTrigger>
           <TabsTrigger value="all-entries">All Entries</TabsTrigger>
           <TabsTrigger value="manage-users">Manage Users</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="leave-management">Leave Management</TabsTrigger>
         </TabsList>
         
         <TabsContent value="team-summary" className="mt-4">
@@ -598,7 +638,6 @@ export default function AdminDashboardPage() {
             </Tabs>
         </TabsContent>
 
-
         <TabsContent value="manage-users" className="mt-4">
             <ManageUsers 
               employees={users} 
@@ -610,6 +649,10 @@ export default function AdminDashboardPage() {
 
         <TabsContent value="notifications" className="mt-4">
             <NotificationManagement />
+        </TabsContent>
+
+        <TabsContent value="leave-management" className="mt-4">
+            <LeaveManagement />
         </TabsContent>
       </Tabs>
       </div>

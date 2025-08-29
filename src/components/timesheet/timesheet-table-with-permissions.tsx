@@ -224,15 +224,9 @@ export default function TimesheetTableWithPermissions({
                   </TableCell>
                   <TableCell>{entry.hours}h</TableCell>
                   <TableCell>
-                    {entry.status === 'rejected' ? (
-                      <Badge variant="destructive" className="text-xs">
-                        Rejected
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-xs">
-                        Approved
-                      </Badge>
-                    )}
+                    <Badge variant="secondary" className="text-xs">
+                      Approved
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -259,19 +253,19 @@ export default function TimesheetTableWithPermissions({
                               variant="outline"
                               size="sm"
                               onClick={() => setDeleteConfirmId(entry.id)}
-                              disabled={!canUserDelete(entry) || entry.status === 'rejected'}
+                              disabled={!canUserDelete(entry)}
                               className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                              title={entry.status === 'rejected' ? 'Already rejected' : 'Reject entry'}
+                              title="Delete entry"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Reject Time Entry</AlertDialogTitle>
+                              <AlertDialogTitle>Delete Time Entry</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to reject this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
-                                The user will see this entry as rejected in their dashboard.
+                                Are you sure you want to delete this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
+                                This action cannot be undone and will permanently remove the entry from the database.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -280,7 +274,7 @@ export default function TimesheetTableWithPermissions({
                                 onClick={() => handleDelete(entry.id)}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
-                                Reject Entry
+                                Delete Entry
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>

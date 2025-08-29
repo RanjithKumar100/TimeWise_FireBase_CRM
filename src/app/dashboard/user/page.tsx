@@ -28,9 +28,6 @@ interface WorkLogEntry {
   country: string;
   task: string;
   hours: number;
-  status?: 'approved' | 'rejected';
-  rejectedAt?: Date;
-  rejectedBy?: string;
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
@@ -65,7 +62,7 @@ export default function UserDashboardPage() {
   const fetchWorkLogs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/worklogs?limit=1000', {
+      const response = await fetch('/api/worklogs?limit=1000&personalOnly=true', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
         }
@@ -81,8 +78,6 @@ export default function UserDashboardPage() {
         date: new Date(log.date),
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
-        status: log.status || 'approved',
-        rejectedAt: log.rejectedAt ? new Date(log.rejectedAt) : undefined,
       }));
       setAllWorkLogs(logs);
       setWorkLogs(logs);
@@ -297,12 +292,16 @@ export default function UserDashboardPage() {
       {/* User Role Badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">My Dashboard</h1>
+          <h1 className="text-2xl font-bold">My Personal Dashboard</h1>
           <Badge variant={currentUser.role === 'Admin' ? 'default' : 'secondary'} className="flex items-center gap-1">
             <Shield className="w-3 h-3" />
             {currentUser.role}
           </Badge>
         </div>
+        {currentUser.role === 'Admin' && (
+          <div className="text-right">
+          </div>
+        )}
       </div>
 
       {/* Filter Controls */}

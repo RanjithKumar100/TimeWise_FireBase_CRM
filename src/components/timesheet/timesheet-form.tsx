@@ -48,6 +48,7 @@ interface TimesheetFormProps {
 
 export default function TimesheetForm({ onSave, currentUser, myTasks, editingEntry, onCancel }: TimesheetFormProps) {
   const { toast } = useToast();
+  const [leaveDates, setLeaveDates] = useState<Date[]>([]);
 
   const form = useForm<TimesheetFormValues>({
     resolver: zodResolver(formSchema),
@@ -60,6 +61,36 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
       minutes: editingEntry ? Math.round((editingEntry.hours - Math.floor(editingEntry.hours)) * 60) : 0,
     },
   });
+
+  // Fetch leave dates
+  const fetchLeaveDates = async () => {
+    try {
+      const today = new Date();
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(today.getMonth() - 3);
+      
+      const startDate = threeMonthsAgo.toISOString().split('T')[0];
+      const endDate = today.toISOString().split('T')[0];
+      
+      const response = await fetch(`/api/leaves?startDate=${startDate}&endDate=${endDate}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const dates = result.data.leaves.map((leave: any) => new Date(leave.date));
+        setLeaveDates(dates);
+      }
+    } catch (error) {
+      console.error('Failed to fetch leave dates:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeaveDates();
+  }, []);
 
   useEffect(() => {
     if (editingEntry) {
@@ -85,6 +116,24 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
         toast({
           title: "Invalid Date",
           description: "You can only enter/edit data within the last 6 days.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // Validate leave day for non-admin users
+    if (currentUser.role !== 'Admin') {
+      const isLeaveDay = leaveDates.some(leaveDate => {
+        const dateString = data.date.toISOString().split('T')[0];
+        const leaveDateString = leaveDate.toISOString().split('T')[0];
+        return dateString === leaveDateString;
+      });
+
+      if (isLeaveDay) {
+        toast({
+          title: "Leave Day",
+          description: "Cannot create timesheet entries on company leave days. Contact admin if this entry is required.",
           variant: "destructive",
         });
         return;
@@ -158,13 +207,20 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
                           const sixDaysAgo = new Date();
                           sixDaysAgo.setDate(today.getDate() - 6);
                           
-                          // Admin can select any date (past only), users restricted to 6-day window
+                          // Check if date is a leave day (disabled for non-admins)
+                          const isLeaveDay = leaveDates.some(leaveDate => {
+                            const dateString = date.toISOString().split('T')[0];
+                            const leaveDateString = leaveDate.toISOString().split('T')[0];
+                            return dateString === leaveDateString;
+                          });
+                          
+                          // Admin can select any date (past only), but leave days get visual indication
                           if (currentUser.role === 'Admin') {
                             return date > today || date < new Date('1900-01-01');
                           }
                           
-                          // Users: only allow dates within the last 6 days (including today)
-                          return date > today || date < sixDaysAgo;
+                          // Users: disabled if future date, older than 6 days, or leave day
+                          return date > today || date < sixDaysAgo || isLeaveDay;
                         }}
                         initialFocus
                       />
@@ -180,7 +236,7 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Verticle</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a verticle" />

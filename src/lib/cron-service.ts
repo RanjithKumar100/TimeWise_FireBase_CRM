@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { notificationService } from './notification-service';
+import Leave from './models/Leave';
 
 class CronService {
   private jobs: Map<string, cron.ScheduledTask> = new Map();
@@ -103,6 +104,13 @@ class CronService {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayString = yesterday.toISOString().split('T')[0];
+        
+        // Check if yesterday was a leave day
+        const isYesterdayLeave = await Leave.isLeaveDay(yesterday);
+        
+        if (isYesterdayLeave) {
+          return; // Skip if yesterday was a leave day
+        }
         
         const urgentMissingEntries = missingEntries.filter(entry => 
           entry.missingDates.some(date => 
