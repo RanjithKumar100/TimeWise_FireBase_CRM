@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import SummaryChart from './summary-chart';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
-import { downloadDataAsExcel } from '@/lib/utils';
+import { downloadDataAsExcel, calculateEmployeeExtraTime, formatExtraTime } from '@/lib/utils';
 import { verticleColors } from '@/lib/colors';
 
 interface TeamSummaryProps {
@@ -50,12 +50,12 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
   }, [selectedEntries]);
 
   const teamOverallData = useMemo(() => {
-    const employeeData = new Map<string, { name: string, hoursByVerticle: Map<Verticle, number>, total: number }>();
+    const employeeData = new Map<string, { name: string, hoursByVerticle: Map<Verticle, number>, total: number, extraTime: number, employeeId: string }>();
 
     employees.forEach(emp => {
         const verticleMap = new Map<Verticle, number>();
         verticles.forEach(v => verticleMap.set(v, 0));
-        employeeData.set(emp.id, { name: emp.name, hoursByVerticle: verticleMap, total: 0 });
+        employeeData.set(emp.id, { name: emp.name, hoursByVerticle: verticleMap, total: 0, extraTime: 0, employeeId: emp.id });
     });
 
     entries.forEach(entry => {
@@ -64,6 +64,11 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
             empData.hoursByVerticle.set(entry.verticle, (empData.hoursByVerticle.get(entry.verticle) || 0) + entry.hours);
             empData.total += entry.hours;
         }
+    });
+
+    // Calculate extra time for each employee
+    employeeData.forEach((empData, employeeId) => {
+        empData.extraTime = calculateEmployeeExtraTime(entries, employeeId);
     });
 
     return Array.from(employeeData.values());
@@ -121,6 +126,7 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
                               </TableHead>
                             ))}
                             <TableHead className="text-right font-bold">Total</TableHead>
+                            <TableHead className="text-right font-bold text-orange-600">Extra Time</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -129,6 +135,9 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
                                 <TableCell className="font-medium">{empData.name}</TableCell>
                                 {verticles.map(v => <TableCell key={v} className="text-right">{empData.hoursByVerticle.get(v)?.toFixed(1)}</TableCell>)}
                                 <TableCell className="text-right font-bold">{empData.total.toFixed(1)}</TableCell>
+                                <TableCell className="text-right font-bold text-orange-600">
+                                  {empData.extraTime > 0 ? formatExtraTime(empData.extraTime) : '0h'}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Clock, Hourglass, BarChart, Users, Shield, AlertTriangle, Download, Filter, Search } from 'lucide-react';
+import { Clock, Hourglass, BarChart, Users, Shield, AlertTriangle, Download, Filter, Search, Timer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { formatDateForAPI } from '@/lib/date-utils';
+import { calculateEmployeeExtraTime, formatExtraTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -188,9 +189,22 @@ export default function AdminDashboardPage() {
       'Created At': log.createdAt.toLocaleDateString()
     }));
 
+    // Add extra time summary per employee
+    const uniqueEmployees = [...new Set(workLogs.map(log => log.employeeId))];
+    const extraTimeData = uniqueEmployees.map(employeeId => {
+      const employee = users.find(u => u.id === employeeId);
+      return {
+        'Employee': employee?.name || 'Unknown',
+        'Email': employee?.email || 'N/A',
+        'Total Extra Time': formatExtraTime(calculateEmployeeExtraTime(workLogs, employeeId))
+      };
+    });
+
     const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const extraTimeSheet = XLSX.utils.json_to_sheet(extraTimeData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Team Work Logs');
+    XLSX.utils.book_append_sheet(workbook, extraTimeSheet, 'Extra Time Summary');
     
     const monthLabel = selectedMonth === 'all' ? 'All_Months' : 
       monthOptions.find(opt => opt.value === selectedMonth)?.label.replace(' ', '_') || selectedMonth;
@@ -414,6 +428,21 @@ export default function AdminDashboardPage() {
     return workLogs.filter(entry => !entry.canEdit).length;
   }, [workLogs]);
 
+  const totalExtraTimeThisMonth = useMemo(() => {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const recentWorkLogs = workLogs.filter(entry => entry.date > oneMonthAgo);
+    
+    let totalExtraTime = 0;
+    const uniqueEmployees = [...new Set(recentWorkLogs.map(entry => entry.employeeId))];
+    
+    uniqueEmployees.forEach(employeeId => {
+      totalExtraTime += calculateEmployeeExtraTime(recentWorkLogs, employeeId);
+    });
+    
+    return totalExtraTime;
+  }, [workLogs]);
+
   if (!user || user.role !== 'Admin' || loading) {
     return <div className="flex h-full w-full items-center justify-center"><p>Loading admin dashboard...</p></div>;
   }
@@ -530,10 +559,11 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <StatsCard title="Total Hours (Month)" value={totalHoursThisMonth.toFixed(1)} icon={Clock} />
         <StatsCard title="Projects (Month)" value={projectsThisMonth} icon={Hourglass} />
         <StatsCard title="Team Size" value={users.filter(emp => emp.isActive).length} icon={Users} />
+        <StatsCard title="Extra Time (Month)" value={formatExtraTime(totalExtraTimeThisMonth)} icon={Timer} />
       </div>
 
       <Tabs defaultValue="team-summary" className="w-full">
