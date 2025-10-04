@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import type { Employee, TimesheetEntry } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { formatTimeSpent } from '@/lib/time-utils';
 
 interface TimesheetTableProps {
   entries: TimesheetEntry[];
@@ -25,6 +27,7 @@ export default function TimesheetTable({ entries, employees }: TimesheetTablePro
         const filterMatch =
           filter === '' ||
           entry.task.toLowerCase().includes(filter.toLowerCase()) ||
+          entry.taskDescription?.toLowerCase().includes(filter.toLowerCase()) ||
           entry.verticle.toLowerCase().includes(filter.toLowerCase()) ||
           entry.country.toLowerCase().includes(filter.toLowerCase()) ||
           employeeMap.get(entry.employeeId)?.toLowerCase().includes(filter.toLowerCase());
@@ -64,7 +67,9 @@ export default function TimesheetTable({ entries, employees }: TimesheetTablePro
               <TableHead>Verticle</TableHead>
               <TableHead>Country</TableHead>
               <TableHead>Task</TableHead>
-              <TableHead className="text-right">Hours</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Time Spent</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -75,12 +80,23 @@ export default function TimesheetTable({ entries, employees }: TimesheetTablePro
                 <TableCell>{entry.verticle}</TableCell>
                 <TableCell>{entry.country}</TableCell>
                 <TableCell>{entry.task}</TableCell>
-                <TableCell className="text-right">{entry.hours.toFixed(1)}</TableCell>
+                <TableCell className="max-w-xs truncate" title={entry.taskDescription || 'No description'}>{entry.taskDescription || 'No description'}</TableCell>
+                <TableCell>
+                  <Badge variant={(entry as any).status === 'rejected' ? 'destructive' : 'default'}>
+                    {(entry as any).status === 'rejected' ? 'Rejected' : 'Approved'}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {(entry as any).timeHours !== undefined && (entry as any).timeMinutes !== undefined
+                    ? formatTimeSpent((entry as any).timeHours, (entry as any).timeMinutes)
+                    : formatTimeSpent(entry.hours)
+                  }
+                </TableCell>
               </TableRow>
             ))}
             {filteredEntries.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={employees.length > 1 ? 6 : 5} className="h-24 text-center">
+                    <TableCell colSpan={employees.length > 1 ? 8 : 7} className="h-24 text-center">
                         No results found.
                     </TableCell>
                 </TableRow>

@@ -9,6 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { TimesheetEntry, Employee } from '@/lib/types';
+import { formatTimeSpent } from '@/lib/time-utils';
+import { formatDateForAPI } from '@/lib/date-utils';
 
 interface CalendarViewProps {
   entries: TimesheetEntry[];
@@ -26,8 +28,8 @@ export default function CalendarView({ entries, employees }: CalendarViewProps) 
   // Fetch leave dates for the current month
   const fetchLeaveDates = async (date: Date) => {
     try {
-      const startDate = startOfMonth(date).toISOString().split('T')[0];
-      const endDate = endOfMonth(date).toISOString().split('T')[0];
+      const startDate = formatDateForAPI(startOfMonth(date));
+      const endDate = formatDateForAPI(endOfMonth(date));
       
       const response = await fetch(`/api/leaves?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
@@ -78,8 +80,8 @@ export default function CalendarView({ entries, employees }: CalendarViewProps) 
   // Helper to check if a date is a leave day
   const isLeaveDay = (date: Date) => {
     return leaveDates.some(leaveDate => {
-      const dateString = date.toISOString().split('T')[0];
-      const leaveDateString = leaveDate.toISOString().split('T')[0];
+      const dateString = formatDateForAPI(date);
+      const leaveDateString = formatDateForAPI(leaveDate);
       return dateString === leaveDateString;
     });
   };
@@ -176,7 +178,7 @@ export default function CalendarView({ entries, employees }: CalendarViewProps) 
                           <p className="text-sm font-medium">Time Entries:</p>
                           {dayEntries.map(entry => (
                             <div key={entry.id} className="text-sm">
-                               <p className="font-medium">{entry.task} <span className="text-muted-foreground">({entry.hours}h)</span></p>
+                               <p className="font-medium">{entry.task} <span className="text-muted-foreground font-mono">({formatTimeSpent(entry.hours)})</span></p>
                                <p className="text-xs text-muted-foreground">{employeeMap.get(entry.employeeId)} - <Badge variant="secondary">{entry.verticle}</Badge></p>
                             </div>
                           ))}

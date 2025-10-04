@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Employee, UserRole } from '@/lib/types';
-import { isAdmin, canManageUsers, canViewAllData } from '@/lib/permissions';
+import { isAdmin, canManageUsers, canViewAllData, isInspection, canEditTimesheets, shouldShowTimesheetEntry } from '@/lib/permissions';
 import { apiClient, ApiError } from '@/lib/api';
 
 interface AuthContextType {
@@ -11,8 +11,11 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAdmin: () => boolean;
+  isInspection: () => boolean;
   canManageUsers: () => boolean;
   canViewAllData: () => boolean;
+  canEditTimesheets: () => boolean;
+  shouldShowTimesheetEntry: () => boolean;
   hasRole: (role: UserRole) => boolean;
 }
 
@@ -88,18 +91,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkIsAdmin = () => user ? isAdmin(user) : false;
+  const checkIsInspection = () => user ? isInspection(user) : false;
   const checkCanManageUsers = () => user ? canManageUsers(user) : false;
   const checkCanViewAllData = () => user ? canViewAllData(user) : false;
+  const checkCanEditTimesheets = () => user ? canEditTimesheets(user) : false;
+  const checkShouldShowTimesheetEntry = () => user ? shouldShowTimesheetEntry(user) : false;
   const hasRole = (role: UserRole) => user ? user.role === role : false;
 
-  const value = { 
-    user, 
-    loading, 
-    login, 
+  const value = {
+    user,
+    loading,
+    login,
     logout,
     isAdmin: checkIsAdmin,
+    isInspection: checkIsInspection,
     canManageUsers: checkCanManageUsers,
     canViewAllData: checkCanViewAllData,
+    canEditTimesheets: checkCanEditTimesheets,
+    shouldShowTimesheetEntry: checkShouldShowTimesheetEntry,
     hasRole
   };
 

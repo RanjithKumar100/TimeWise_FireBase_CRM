@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,8 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Pagination, PaginationInfo } from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, UserX, UserCheck, Trash2, Shield, User } from 'lucide-react';
+import { PlusCircle, UserX, UserCheck, Trash2, Shield, User, Eye } from 'lucide-react';
 
 interface ManageUsersProps {
   employees: Employee[];
@@ -26,20 +27,34 @@ interface ManageUsersProps {
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email('Please enter a valid email address.'),
-  role: z.enum(['User', 'Admin'], { required_error: 'Please select a role.' }),
+  role: z.enum(['User', 'Admin', 'Inspection'], { required_error: 'Please select a role.' }),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
 
 type UserFormValues = z.infer<typeof formSchema>;
 
+const ITEMS_PER_PAGE = 10;
+
 export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onUserDeleted }: ManageUsersProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
   const form = useForm<UserFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { name: '', email: '', role: 'User', password: '' },
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(employees.length / ITEMS_PER_PAGE);
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return employees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [employees, currentPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const onSubmit = async (data: UserFormValues) => {
     try {
@@ -161,7 +176,7 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Team Members ({employees.length})</CardTitle>
-          <CardDescription>Manage all users in the system. Deleting users preserves their work log data.</CardDescription>
+          <CardDescription>Manage all users in the system.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -175,7 +190,7 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((user) => (
+                {paginatedEmployees.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div>
@@ -195,6 +210,8 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                       <div className="flex items-center gap-1">
                         {user.role === 'Admin' ? (
                           <Shield className="h-4 w-4 text-blue-600" />
+                        ) : user.role === 'Inspection' ? (
+                          <Eye className="h-4 w-4 text-purple-600" />
                         ) : (
                           <User className="h-4 w-4 text-gray-600" />
                         )}
@@ -257,22 +274,45 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                     </TableCell>
                   </TableRow>
                 ))}
-                {employees.length === 0 && (
+                {paginatedEmployees.length === 0 && employees.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                       No users found. Create your first user to get started.
                     </TableCell>
                   </TableRow>
                 )}
+                {paginatedEmployees.length === 0 && employees.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      No users found on this page.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
+          {employees.length > ITEMS_PER_PAGE && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+              <PaginationInfo 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={employees.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+              />
+              <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
+      
       <Card>
         <CardHeader>
           <CardTitle>Create New User</CardTitle>
-          <CardDescription>Add a new team member and set their credentials.</CardDescription>
+          <CardDescription>Add a new team member.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -284,7 +324,7 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                   <FormItem>
                     <FormLabel>Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., John Doe" {...field} />
+                      <Input placeholder="e.g: Jagath" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -297,7 +337,7 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                   <FormItem>
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="e.g., john.doe@company.com" {...field} />
+                      <Input type="email" placeholder="e.g: jagath@company.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -318,6 +358,7 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                       <SelectContent>
                         <SelectItem value="User">User</SelectItem>
                         <SelectItem value="Admin">Admin</SelectItem>
+                        <SelectItem value="Inspection">Inspection</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -331,7 +372,7 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="Set an initial password" {...field} />
+                      <Input type="password" placeholder="Set a password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

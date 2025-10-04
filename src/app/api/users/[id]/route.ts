@@ -31,7 +31,12 @@ export async function GET(
     const workLogCount = await WorkLog.countDocuments({ userId: params.id });
     const totalHours = await WorkLog.aggregate([
       { $match: { userId: params.id } },
-      { $group: { _id: null, total: { $sum: '$hoursSpent' } } }
+      {
+        $addFields: {
+          decimalHours: { $add: ['$hours', { $divide: ['$minutes', 60] }] }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$decimalHours' } } }
     ]);
 
     const userStats = {

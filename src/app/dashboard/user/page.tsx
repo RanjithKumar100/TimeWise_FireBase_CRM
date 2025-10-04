@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Employee, TimesheetEntry } from '@/lib/types';
+import type { Employee, TimesheetEntry, Verticle } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,10 +24,13 @@ import { formatDateForAPI } from '@/lib/date-utils';
 interface WorkLogEntry {
   id: string;
   date: Date;
-  verticle: string;
+  verticle: Verticle;
   country: string;
   task: string;
-  hours: number;
+  taskDescription?: string;
+  hours: number; // Legacy decimal hours field
+  timeHours?: number; // New separate hours field
+  timeMinutes?: number; // New separate minutes field
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
@@ -46,16 +49,17 @@ export default function UserDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<WorkLogEntry | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const currentUser: Employee | null = useMemo(() => {
     return user ? {
       id: user.id,
+      userId: user.id, // Add userId for compatibility
       name: user.name,
       email: user.email,
       role: user.role as 'Admin' | 'User',
       isActive: user.isActive,
       department: 'General', // Default department
-      joinedAt: new Date(), // Default joined date
     } : null;
   }, [user]);
 
@@ -130,7 +134,7 @@ export default function UserDashboardPage() {
     }
   }, [user]);
 
-  const handleSaveEntry = async (newEntry: Omit<TimesheetEntry, 'id' | 'employeeId' | 'createdAt' | 'updatedAt'>) => {
+  const handleSaveEntry = async (newEntry: Omit<TimesheetEntry, 'id' | 'employeeId' | 'createdAt' | 'updatedAt'> & { taskDescription: string; hours: number; minutes: number }) => {
     if (!currentUser) return;
 
     try {
@@ -147,7 +151,9 @@ export default function UserDashboardPage() {
             verticle: newEntry.verticle,
             country: newEntry.country,
             task: newEntry.task,
-            hoursSpent: newEntry.hours,
+            taskDescription: newEntry.taskDescription,
+            hours: newEntry.hours,
+            minutes: newEntry.minutes,
           }),
         });
 
@@ -168,31 +174,72 @@ export default function UserDashboardPage() {
             log.id === editingEntry.id ? updatedLog : log
           )
         );
+        setAllWorkLogs(prevLogs => 
+          prevLogs.map(log => 
+            log.id === editingEntry.id ? updatedLog : log
+          )
+        );
         setEditingEntry(null);
 
         toast({
           title: "Success",
           description: "Work log updated successfully",
         });
+        setRefreshTrigger(prev => prev + 1);
       } else {
         // Create new entry
+        const requestData = {
+          date: formatDateForAPI(newEntry.date),
+          verticle: newEntry.verticle,
+          country: newEntry.country,
+          task: newEntry.task,
+          taskDescription: newEntry.taskDescription,
+          hours: newEntry.hours,
+          minutes: newEntry.minutes,
+        };
+        
+        console.log('🔍 Sending worklog data:', requestData);
+        
+        const authToken = localStorage.getItem('timewise-auth-token');
+        console.log('🔍 Auth token present:', !!authToken);
+        console.log('🔍 Auth token length:', authToken?.length || 0);
+        
         const response = await fetch('/api/worklogs', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+            'Authorization': `Bearer ${authToken}`
           },
-          body: JSON.stringify({
-            date: formatDateForAPI(newEntry.date),
-            verticle: newEntry.verticle,
-            country: newEntry.country,
-            task: newEntry.task,
-            hoursSpent: newEntry.hours,
-          }),
+          body: JSON.stringify(requestData),
+        });
+        
+        console.log('🔍 Response received:', {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
         });
 
         if (!response.ok) {
-          throw new Error('Failed to create work log');
+          console.error('❌ API Error Response:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url,
+            headers: Object.fromEntries(response.headers.entries())
+          });
+          
+          let errorData;
+          try {
+            const responseText = await response.text();
+            console.error('❌ Raw response text:', responseText);
+            errorData = responseText ? JSON.parse(responseText) : { message: 'Empty response' };
+          } catch (parseError) {
+            console.error('❌ Failed to parse error response:', parseError);
+            errorData = { message: 'Invalid JSON response' };
+          }
+          
+          console.error('❌ Parsed error data:', errorData);
+          throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
         }
 
         const result = await response.json();
@@ -204,11 +251,13 @@ export default function UserDashboardPage() {
         };
 
         setWorkLogs(prevLogs => [newLog, ...prevLogs]);
+        setAllWorkLogs(prevLogs => [newLog, ...prevLogs]);
 
         toast({
           title: "Success",
           description: "Work log created successfully",
         });
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (error: any) {
       toast({
@@ -241,11 +290,13 @@ export default function UserDashboardPage() {
       }
 
       setWorkLogs(prevLogs => prevLogs.filter(log => log.id !== entryId));
+      setAllWorkLogs(prevLogs => prevLogs.filter(log => log.id !== entryId));
       
       toast({
         title: "Success",
         description: "Work log deleted successfully",
       });
+      setRefreshTrigger(prev => prev + 1);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -258,6 +309,7 @@ export default function UserDashboardPage() {
   const handleCancelEdit = () => {
     setEditingEntry(null);
   };
+
 
   const myHoursThisMonth = useMemo(() => {
     const oneMonthAgo = new Date();
@@ -354,6 +406,7 @@ export default function UserDashboardPage() {
                 myTasks={workLogs.map(e => e.task)}
                 editingEntry={editingEntry}
                 onCancel={handleCancelEdit}
+                refreshTrigger={refreshTrigger}
               />
             </div>
             <div className="lg:col-span-2">

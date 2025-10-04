@@ -96,7 +96,8 @@ export async function seedDatabase() {
         verticle: verticles[Math.floor(Math.random() * verticles.length)],
         country: countries[Math.floor(Math.random() * countries.length)],
         task: tasks[Math.floor(Math.random() * tasks.length)],
-        hoursSpent: Math.round((Math.random() * 7 + 1) * 2) / 2, // 1-8 hours in 0.5 increments
+        hours: Math.floor(Math.random() * 8 + 1), // 1-8 hours
+        minutes: [0, 15, 30, 45][Math.floor(Math.random() * 4)], // 0, 15, 30, or 45 minutes
         createdAt: createdDate,
         updatedAt: createdDate,
       });

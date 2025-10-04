@@ -327,7 +327,7 @@ export default function NotificationManagement() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Check which users have missing timesheet entries without sending notifications.
+                  Check which users have missing timesheet entries.
                 </p>
                 <Button 
                   onClick={checkForMissingEntries} 
@@ -387,9 +387,6 @@ export default function NotificationManagement() {
                     Force Resend All
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  "Send New" skips users already notified today. "Force Resend" sends to all users.
-                </p>
               </CardContent>
             </Card>
           </div>

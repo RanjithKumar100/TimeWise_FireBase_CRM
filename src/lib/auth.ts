@@ -10,7 +10,7 @@ if (!JWT_SECRET) {
 export interface JWTPayload {
   userId: string;
   email: string;
-  role: 'Admin' | 'User';
+  role: 'Admin' | 'User' | 'Inspection';
   name: string;
 }
 

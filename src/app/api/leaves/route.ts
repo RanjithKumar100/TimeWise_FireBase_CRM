@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Leave from '@/lib/models/Leave';
 import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { parseAPIDate } from '@/lib/date-utils';
 
 // GET /api/leaves - Get all leave dates
 export async function GET(request: NextRequest) {
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Date is required', 400);
     }
 
-    const leaveDate = new Date(date);
+    const leaveDate = parseAPIDate(date);
     
     // Validate date format
     if (isNaN(leaveDate.getTime())) {

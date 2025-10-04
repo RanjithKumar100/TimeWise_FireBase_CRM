@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import * as cron from 'node-cron';
 import { notificationService } from './notification-service';
 import Leave from './models/Leave';
 
@@ -77,9 +77,8 @@ class CronService {
         console.error('❌ Error in daily notification check:', error);
       }
     }, {
-      scheduled: false, // Don't start immediately
       timezone: process.env.TIMEZONE || 'America/New_York' // Adjust timezone as needed
-    });
+    } as any);
 
     this.jobs.set('daily-notification-check', task);
     
@@ -148,9 +147,8 @@ class CronService {
         console.error('❌ Error in next-day notification check:', error);
       }
     }, {
-      scheduled: false, // Don't start immediately
       timezone: process.env.TIMEZONE || 'Asia/Kolkata'
-    });
+    } as any);
 
     this.jobs.set('next-day-notification-check', task);
     
@@ -227,7 +225,7 @@ class CronService {
   getJobsStatus(): { [key: string]: boolean } {
     const status: { [key: string]: boolean } = {};
     for (const [name, job] of this.jobs) {
-      status[name] = job.running;
+      status[name] = (job as any).running;
     }
     return status;
   }

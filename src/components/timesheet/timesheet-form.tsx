@@ -1,32 +1,57 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { TimesheetEntry, Employee } from '@/lib/types';
+import { formatDateForAPI } from '@/lib/date-utils';
 
 
 const verticles = ['CMIS', 'TRI', 'LOF', 'TRG'] as const;
+
+// Default task options (will be configurable by admin later)
+const defaultTaskOptions: ComboboxOption[] = [
+  { value: 'Video Editing', label: 'Video Editing' },
+  { value: 'Content Creation', label: 'Content Creation' },
+  { value: 'Meeting', label: 'Meeting' },
+  { value: 'Documentation', label: 'Documentation' },
+  { value: 'Development', label: 'Development' },
+  { value: 'Design', label: 'Design' },
+  { value: 'Research', label: 'Research' },
+  { value: 'Testing', label: 'Testing' },
+  { value: 'Training', label: 'Training' },
+  { value: 'Client Communication', label: 'Client Communication' },
+];
 
 const formSchema = z.object({
   date: z.date({ required_error: 'A date is required.' }),
   verticle: z.enum(verticles, { required_error: 'Please select a verticle.' }),
   country: z.string().min(2, 'Country must be at least 2 characters.'),
-  task: z.string().min(3, 'Task description is required.'),
-  hours: z.coerce.number().min(0, 'Hours cannot be negative.').max(23, 'Hours cannot exceed 23.'),
+  task: z.string().min(3, 'Task name is required.'),
+  taskDescription: z.string()
+    .min(1, 'Task description is required.')
+    .refine((value) => {
+      const wordCount = value.trim().split(/\s+/).filter(word => word.length > 0).length;
+      return wordCount >= 3;
+    }, {
+      message: 'Task description must contain at least 3 words.',
+    }),
+  hours: z.coerce.number().min(0, 'Hours cannot be negative.').max(24, 'Hours cannot exceed 24.'),
   minutes: z.coerce.number().min(0, 'Minutes cannot be negative.').max(59, 'Minutes cannot exceed 59.'),
 }).refine((data) => {
   const totalMinutes = (data.hours * 60) + data.minutes;
@@ -39,16 +64,50 @@ const formSchema = z.object({
 type TimesheetFormValues = z.infer<typeof formSchema>;
 
 interface TimesheetFormProps {
-  onSave: (data: Omit<TimesheetEntry, 'id' | 'employeeId' | 'createdAt' | 'updatedAt'>) => void;
+  onSave: (data: Omit<TimesheetEntry, 'id' | 'employeeId' | 'createdAt' | 'updatedAt'> & { taskDescription: string; hours: number; minutes: number }) => void;
   currentUser: Employee;
   myTasks: string[];
   editingEntry?: TimesheetEntry | null;
   onCancel?: () => void;
+  refreshTrigger?: number; // Add this to trigger refresh when entries change
 }
 
-export default function TimesheetForm({ onSave, currentUser, myTasks, editingEntry, onCancel }: TimesheetFormProps) {
+export default function TimesheetForm({ onSave, currentUser, myTasks, editingEntry, onCancel, refreshTrigger }: TimesheetFormProps) {
   const { toast } = useToast();
   const [leaveDates, setLeaveDates] = useState<Date[]>([]);
+  const [dailyHours, setDailyHours] = useState(0);
+  const [dailyHoursLoaded, setDailyHoursLoaded] = useState(false);
+  const [taskOptions, setTaskOptions] = useState<ComboboxOption[]>(defaultTaskOptions);
+  const [dailyHoursTarget, setDailyHoursTarget] = useState(8);
+  const [editTimeLimit, setEditTimeLimit] = useState(3);
+
+  const fetchSystemConfig = async () => {
+    try {
+      const response = await fetch('/api/system-config', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const taskOptions = result.data.availableTasks.map((task: string) => ({
+          value: task,
+          label: task
+        }));
+        setTaskOptions(taskOptions);
+        
+        // Update daily hours target from system config (use maxHoursPerDay as the daily target)
+        setDailyHoursTarget(result.data.maxHoursPerDay || result.data.standardWorkingHours || 8);
+        setEditTimeLimit(result.data.editTimeLimit || 3);
+        console.log('🔄 Updated daily hours target:', result.data.maxHoursPerDay || result.data.standardWorkingHours || 8);
+        console.log('🔄 Updated edit time limit:', result.data.editTimeLimit || 3);
+      }
+    } catch (error) {
+      console.error('Failed to fetch system config:', error);
+      // Keep default options on error
+    }
+  };
 
   const form = useForm<TimesheetFormValues>({
     resolver: zodResolver(formSchema),
@@ -57,10 +116,66 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
       verticle: editingEntry?.verticle,
       country: editingEntry?.country || '',
       task: editingEntry?.task || '',
-      hours: editingEntry ? Math.floor(editingEntry.hours) : 8,
-      minutes: editingEntry ? Math.round((editingEntry.hours - Math.floor(editingEntry.hours)) * 60) : 0,
+      taskDescription: (editingEntry as any)?.taskDescription || '',
+      hours: editingEntry ? ((editingEntry as any).timeHours !== undefined ? (editingEntry as any).timeHours : Math.floor(editingEntry.hours)) : 0,
+      minutes: editingEntry ? ((editingEntry as any).timeMinutes !== undefined ? (editingEntry as any).timeMinutes : Math.round((Math.round(editingEntry.hours * 100) / 100 - Math.floor(editingEntry.hours)) * 60)) : 0,
     },
   });
+
+  // Fetch daily hours for selected date
+  const fetchDailyHours = async (selectedDate: Date) => {
+    try {
+      const dateString = formatDateForAPI(selectedDate);
+      console.log('🔍 Fetching daily hours for date:', dateString, 'User:', currentUser.id);
+      
+      const response = await fetch('/api/worklogs', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('🔍 API Response structure:', result);
+        
+        // Check different possible response structures
+        let worklogsArray = [];
+        if (result.data && result.data.worklogs) {
+          worklogsArray = result.data.worklogs;
+        } else if (result.data && result.data.workLogs) {
+          worklogsArray = result.data.workLogs;
+        } else if (result.worklogs) {
+          worklogsArray = result.worklogs;
+        } else if (result.workLogs) {
+          worklogsArray = result.workLogs;
+        } else if (Array.isArray(result)) {
+          worklogsArray = result;
+        } else {
+          console.error('❌ Unknown API response structure:', result);
+          setDailyHoursLoaded(true);
+          return;
+        }
+
+        // Filter worklogs for the selected date and current user
+        const dailyLogs = worklogsArray.filter((log: any) => {
+          const logDate = formatDateForAPI(new Date(log.date));
+          return logDate === dateString && log.employeeId === currentUser.id;
+        });
+
+        // Calculate total hours for the day (excluding current editing entry if any)
+        const totalHours = dailyLogs
+          .filter((log: any) => editingEntry ? log.id !== editingEntry.id : true)
+          .reduce((sum: number, log: any) => sum + log.hours, 0);
+        
+        console.log('🔍 Daily logs found:', dailyLogs.length, 'Total hours:', totalHours);
+        setDailyHours(Math.round(totalHours * 100) / 100);
+        setDailyHoursLoaded(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch daily hours:', error);
+      setDailyHoursLoaded(true); // Set loaded even on error to prevent infinite loading
+    }
+  };
 
   // Fetch leave dates
   const fetchLeaveDates = async () => {
@@ -69,8 +184,8 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
       const threeMonthsAgo = new Date();
       threeMonthsAgo.setMonth(today.getMonth() - 3);
       
-      const startDate = threeMonthsAgo.toISOString().split('T')[0];
-      const endDate = today.toISOString().split('T')[0];
+      const startDate = formatDateForAPI(threeMonthsAgo);
+      const endDate = formatDateForAPI(today);
       
       const response = await fetch(`/api/leaves?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
@@ -90,7 +205,51 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
 
   useEffect(() => {
     fetchLeaveDates();
+    fetchSystemConfig();
+    // Fetch initial daily hours for today or editing entry date
+    const selectedDate = editingEntry?.date || new Date();
+    fetchDailyHours(selectedDate);
   }, []);
+
+  // Refresh task options when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger) {
+      fetchSystemConfig();
+    }
+  }, [refreshTrigger]);
+
+  // Listen for system config updates
+  useEffect(() => {
+    const handleConfigUpdate = () => {
+      fetchSystemConfig();
+    };
+
+    window.addEventListener('systemConfigUpdated', handleConfigUpdate);
+    
+    return () => {
+      window.removeEventListener('systemConfigUpdated', handleConfigUpdate);
+    };
+  }, []);
+
+  // Fetch daily hours when date changes
+  useEffect(() => {
+    const selectedDate = form.watch('date');
+    if (selectedDate) {
+      setDailyHoursLoaded(false);
+      fetchDailyHours(selectedDate);
+    }
+  }, [form.watch('date')]);
+
+  // Refresh daily hours when refreshTrigger changes (when entries are deleted/modified)
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      console.log('🔄 RefreshTrigger changed:', refreshTrigger);
+      const selectedDate = form.getValues('date') || new Date();
+      console.log('🔄 Refreshing hours for date:', formatDateForAPI(selectedDate));
+      setDailyHoursLoaded(false);
+      fetchDailyHours(selectedDate);
+    }
+  }, [refreshTrigger]);
 
   useEffect(() => {
     if (editingEntry) {
@@ -99,23 +258,24 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
         verticle: editingEntry.verticle,
         country: editingEntry.country,
         task: editingEntry.task,
-        hours: Math.floor(editingEntry.hours),
-        minutes: Math.round((editingEntry.hours - Math.floor(editingEntry.hours)) * 60),
+        taskDescription: (editingEntry as any)?.taskDescription || '',
+        hours: (editingEntry as any).timeHours !== undefined ? (editingEntry as any).timeHours : Math.floor(editingEntry.hours),
+        minutes: (editingEntry as any).timeMinutes !== undefined ? (editingEntry as any).timeMinutes : Math.round((Math.round(editingEntry.hours * 100) / 100 - Math.floor(editingEntry.hours)) * 60),
       });
     }
   }, [editingEntry, form]);
 
   const onSubmit = (data: TimesheetFormValues) => {
-    // Validate 6-day rule for non-admin users
+    // Validate edit window rule for non-admin users (gets limit from system config)
     if (currentUser.role !== 'Admin') {
       const today = new Date();
-      const sixDaysAgo = new Date();
-      sixDaysAgo.setDate(today.getDate() - 6);
-      
-      if (data.date < sixDaysAgo) {
+      const limitDaysAgo = new Date();
+      limitDaysAgo.setDate(today.getDate() - editTimeLimit);
+
+      if (data.date < limitDaysAgo) {
         toast({
           title: "Invalid Date",
-          description: "You can only enter/edit data within the last 6 days.",
+          description: `You can only enter/edit data within the last ${editTimeLimit} days.`,
           variant: "destructive",
         });
         return;
@@ -125,8 +285,8 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
     // Validate leave day for non-admin users
     if (currentUser.role !== 'Admin') {
       const isLeaveDay = leaveDates.some(leaveDate => {
-        const dateString = data.date.toISOString().split('T')[0];
-        const leaveDateString = leaveDate.toISOString().split('T')[0];
+        const dateString = formatDateForAPI(data.date);
+        const leaveDateString = formatDateForAPI(leaveDate);
         return dateString === leaveDateString;
       });
 
@@ -140,27 +300,43 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
       }
     }
 
-    // Convert hours and minutes to decimal hours
-    const totalHours = data.hours + (data.minutes / 60);
+    // Send hours and minutes separately instead of converting to decimal
     const convertedData = {
       ...data,
-      hours: totalHours
+      hours: data.hours,
+      minutes: data.minutes
     };
 
     onSave(convertedData);
+    
+    // Smart reset: preserve verticle selection for new entries, full reset for edits
     if (!editingEntry) {
-      form.reset();
+      const currentVerticle = form.getValues('verticle');
+      
+      // Keep the same date if it's today, otherwise reset to today
+      const today = new Date();
+      const isToday = data.date.toDateString() === today.toDateString();
+      
+      form.reset({
+        date: isToday ? data.date : today,
+        verticle: currentVerticle, // Preserve the selected verticle
+        country: '',
+        task: '',
+        taskDescription: '',
+        hours: 0,
+        minutes: 0,
+      });
     }
-    toast({
-      title: editingEntry ? 'Entry Updated!' : 'Entry Saved!',
-      description: editingEntry ? 'Your time entry has been updated.' : 'Your time has been successfully logged.',
-    });
+    
+    // Let the parent component handle refreshing via refreshTrigger
+    console.log('✅ Entry saved, waiting for parent refreshTrigger...');
   };
 
   const handleCancel = () => {
     form.reset();
     onCancel?.();
   };
+
 
   return (
     <Card className="shadow-sm">
@@ -204,13 +380,13 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
                         onSelect={field.onChange}
                         disabled={(date) => {
                           const today = new Date();
-                          const sixDaysAgo = new Date();
-                          sixDaysAgo.setDate(today.getDate() - 6);
+                          const limitDaysAgo = new Date();
+                          limitDaysAgo.setDate(today.getDate() - editTimeLimit);
                           
                           // Check if date is a leave day (disabled for non-admins)
                           const isLeaveDay = leaveDates.some(leaveDate => {
-                            const dateString = date.toISOString().split('T')[0];
-                            const leaveDateString = leaveDate.toISOString().split('T')[0];
+                            const dateString = formatDateForAPI(date);
+                            const leaveDateString = formatDateForAPI(leaveDate);
                             return dateString === leaveDateString;
                           });
                           
@@ -219,8 +395,8 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
                             return date > today || date < new Date('1900-01-01');
                           }
                           
-                          // Users: disabled if future date, older than 6 days, or leave day
-                          return date > today || date < sixDaysAgo || isLeaveDay;
+                          // Users: disabled if future date, older than edit time limit, or leave day
+                          return date > today || date < limitDaysAgo || isLeaveDay;
                         }}
                         initialFocus
                       />
@@ -270,58 +446,85 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
               name="task"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Task</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Video Editing" {...field} />
-                  </FormControl>
+                  <FormLabel>Task Name</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a task" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent position="popper" side="bottom" sideOffset={5} avoidCollisions={false}>
+                      {taskOptions.map((task) => (
+                        <SelectItem key={task.value} value={task.value}>
+                          {task.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            {/* Time Spent Section */}
-            <div className="space-y-4">
-              <FormLabel>Time Spent</FormLabel>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="hours"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Hours</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0"
-                          max="23"
-                          {...field}
-                          placeholder="0-23"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="minutes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Minutes</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0"
-                          max="59"
-                          step="1"
-                          {...field}
-                          placeholder="0-59"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+            <FormField
+              control={form.control}
+              name="taskDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Task Description</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Provide a detailed description of the work..."
+                      className="min-h-[100px] resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <div className="text-xs text-muted-foreground">
+                    Word count: {field.value ? field.value.trim().split(/\s+/).filter(word => word.length > 0).length : 0} / 3 minimum
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="hours"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm">Hours</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0"
+                        max="23"
+                        {...field}
+                        placeholder="0-23"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="minutes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm">Minutes</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0"
+                        max="59"
+                        step="1"
+                        {...field}
+                        placeholder="0-59"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           </CardContent>
           <CardFooter className="flex justify-end">

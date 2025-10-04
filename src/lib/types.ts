@@ -1,6 +1,6 @@
 export type Verticle = 'CMIS' | 'TRI' | 'LOF' | 'TRG';
 
-export type UserRole = 'Admin' | 'User';
+export type UserRole = 'Admin' | 'User' | 'Inspection';
 
 export type TimesheetEntry = {
   id: string;
@@ -8,7 +8,9 @@ export type TimesheetEntry = {
   verticle: Verticle;
   country: string;
   task: string;
+  taskDescription?: string;
   hours: number;
+  status?: 'approved' | 'rejected';
   employeeId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -16,18 +18,20 @@ export type TimesheetEntry = {
 
 export type Employee = {
   id: string;
+  userId?: string; // For compatibility with existing code
   name: string;
   role: UserRole;
   password?: string;
   email?: string;
   isActive: boolean;
+  department?: string; // For compatibility with existing code
+  joinedAt?: Date; // For compatibility with existing code
 };
 
 export type PermissionCheck = {
   canView: boolean;
   canEdit: boolean;
   canDelete: boolean;
-  editTimeRemaining?: number; // in days
 };
 
 export type AggregatedVerticleData = {

@@ -29,13 +29,17 @@ async function dbConnect(): Promise<mongoose.Connection> {
       bufferCommands: false,
     };
 
-    cached!.promise = mongoose.connect(MONGODB_URI!, opts);
+    cached!.promise = mongoose.connect(MONGODB_URI!, opts) as any;
   }
 
   try {
     const mongooseInstance = await cached!.promise;
-    cached!.conn = mongooseInstance.connection;
-    console.log('✅ Connected to MongoDB');
+    if (mongooseInstance && (mongooseInstance as any).connection) {
+      cached!.conn = (mongooseInstance as any).connection;
+      console.log('✅ Connected to MongoDB');
+    } else {
+      throw new Error('Failed to get mongoose connection');
+    }
   } catch (e) {
     cached!.promise = null;
     console.error('❌ MongoDB connection error:', e);

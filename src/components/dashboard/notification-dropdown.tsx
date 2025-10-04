@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Bell, Calendar, Clock, X, RefreshCw } from 'lucide-react';
+import { Bell, Calendar, Clock, X, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,9 +20,11 @@ export function NotificationDropdown() {
   const { user } = useAuth();
   const { 
     missingDates, 
+    userNotifications,
     loading, 
     notificationCount, 
     dismissNotification, 
+    dismissUserNotification,
     clearAllNotifications,
     refreshNotifications 
   } = useNotifications();
@@ -46,7 +48,7 @@ export function NotificationDropdown() {
         <DropdownMenuLabel className="flex items-center justify-between sticky top-0 bg-background border-b pb-2">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            Timesheet Reminders
+            Notifications
             {notificationCount > 0 && (
               <Badge variant="secondary">{notificationCount}</Badge>
             )}
@@ -85,12 +87,59 @@ export function NotificationDropdown() {
               <div className="flex flex-col items-center py-4 text-center">
                 <Clock className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  All caught up! No missing timesheets.
+                  All caught up! No notifications.
                 </p>
               </div>
             </DropdownMenuItem>
           ) : (
             <div className="p-1">
+              {/* User Notifications (Entry Rejections, etc) */}
+              {userNotifications.map((notification, index) => (
+                <div key={notification.id}>
+                  <DropdownMenuItem 
+                    className="flex flex-col items-start p-3 cursor-default focus:bg-muted/50"
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <div className="flex items-start justify-between w-full">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {notification.type === 'entry_rejected' ? (
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-blue-500" />
+                          )}
+                          <span className="font-medium text-sm">
+                            {notification.type === 'entry_rejected' ? 'Entry Rejected' : 'Notification'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(notification.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => dismissUserNotification(notification.id)}
+                        className="text-xs h-6 px-2 hover:bg-destructive hover:text-destructive-foreground flex items-center gap-1"
+                      >
+                        <X className="h-3 w-3" />
+                        Dismiss
+                      </Button>
+                    </div>
+                  </DropdownMenuItem>
+                  {index < userNotifications.length - 1 && <DropdownMenuSeparator className="mx-2" />}
+                </div>
+              ))}
+              
+              {/* Add separator between user notifications and missing dates */}
+              {userNotifications.length > 0 && missingDates.length > 0 && (
+                <DropdownMenuSeparator className="mx-2" />
+              )}
+              
+              {/* Missing Timesheet Notifications */}
               {missingDates.map((missing, index) => (
                 <div key={missing.date}>
                   <DropdownMenuItem 

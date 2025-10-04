@@ -1,18 +1,42 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface INotificationLog extends Document {
   notificationId: string;
   userId: string;
   userEmail: string;
   userName: string;
-  notificationType: 'missing_timesheet' | 'deadline_reminder' | 'urgent_reminder';
-  missingDates: Date[];
-  daysRemaining: number;
+  notificationType: 'missing_timesheet' | 'deadline_reminder' | 'urgent_reminder' | 'entry_rejected';
+  missingDates?: Date[];
+  daysRemaining?: number;
+  rejectedEntry?: {
+    entryId: string;
+    date: Date;
+    task: string;
+    hours: number;
+    rejectedBy: string;
+    rejectedByName: string;
+  };
   sentAt: Date;
   emailSent: boolean;
   emailError?: string;
+  isRead: boolean;
+  readAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface INotificationLogModel extends Model<INotificationLog> {
+  wasNotificationSentToday(userId: string, notificationType: string, missingDates: Date[]): Promise<boolean>;
+  createNotification(data: {
+    userId: string;
+    userEmail: string;
+    userName: string;
+    notificationType: string;
+    missingDates: Date[];
+    daysRemaining: number;
+    emailSent: boolean;
+    emailError?: string;
+  }): Promise<INotificationLog>;
 }
 
 const NotificationLogSchema: Schema = new Schema(
@@ -43,25 +67,37 @@ const NotificationLogSchema: Schema = new Schema(
       type: String,
       required: [true, 'Notification type is required'],
       enum: {
-        values: ['missing_timesheet', 'deadline_reminder', 'urgent_reminder'],
-        message: 'Notification type must be one of: missing_timesheet, deadline_reminder, urgent_reminder',
+        values: ['missing_timesheet', 'deadline_reminder', 'urgent_reminder', 'entry_rejected'],
+        message: 'Notification type must be one of: missing_timesheet, deadline_reminder, urgent_reminder, entry_rejected',
       },
     },
     missingDates: {
       type: [Date],
-      required: [true, 'Missing dates are required'],
+      required: function(this: INotificationLog) { 
+        return this.notificationType !== 'entry_rejected'; 
+      },
       validate: {
         validator: function(dates: Date[]) {
-          return dates && dates.length > 0;
+          return !dates || dates.length > 0;
         },
         message: 'At least one missing date must be specified',
       },
     },
     daysRemaining: {
       type: Number,
-      required: [true, 'Days remaining is required'],
+      required: function(this: INotificationLog) { 
+        return this.notificationType !== 'entry_rejected'; 
+      },
       min: [0, 'Days remaining cannot be negative'],
       max: [6, 'Days remaining cannot exceed 6'],
+    },
+    rejectedEntry: {
+      entryId: { type: String },
+      date: { type: Date },
+      task: { type: String },
+      hours: { type: Number },
+      rejectedBy: { type: String },
+      rejectedByName: { type: String },
     },
     sentAt: {
       type: Date,
@@ -74,6 +110,13 @@ const NotificationLogSchema: Schema = new Schema(
     emailError: {
       type: String,
       trim: true,
+    },
+    isRead: {
+      type: Boolean,
+      default: false,
+    },
+    readAt: {
+      type: Date,
     },
   },
   {
@@ -159,4 +202,4 @@ NotificationLogSchema.statics.createNotification = async function(data: {
   return await notification.save();
 };
 
-export default mongoose.models.NotificationLog || mongoose.model<INotificationLog>('NotificationLog', NotificationLogSchema);
+export default (mongoose.models.NotificationLog as INotificationLogModel) || mongoose.model<INotificationLog, INotificationLogModel>('NotificationLog', NotificationLogSchema);

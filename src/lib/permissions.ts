@@ -11,12 +11,13 @@ export function daysBetween(date1: Date, date2: Date): number {
 }
 
 /**
- * Checks if a user can edit a timesheet entry based on role and rolling 6-day window
+ * Checks if a user can edit a timesheet entry based on role and rolling edit window
  */
 export function canEditTimesheetEntry(
   entry: TimesheetEntry,
   currentUser: Employee,
-  currentDate: Date = new Date()
+  currentDate: Date = new Date(),
+  editTimeLimit: number = 3
 ): PermissionCheck {
   // Admin has full access to everything
   if (currentUser.role === 'Admin') {
@@ -43,16 +44,13 @@ export function canEditTimesheetEntry(
     canDelete: false,
   };
 
-  // Calculate days since record date using rolling 6-day window
+  // Calculate days since record date using rolling edit window
   const daysSinceRecordDate = daysBetween(entry.date, currentDate);
-  const editTimeRemaining = Math.max(0, 6 - daysSinceRecordDate);
 
-  result.editTimeRemaining = editTimeRemaining;
-
-  // Rolling 6-day window: user can edit if record date is within last 6 days (including today)
+  // Rolling edit window: user can edit if record date is within configured time limit (including today)
   // daysSinceRecordDate >= 0 ensures we don't allow future dates
-  // daysSinceRecordDate <= 6 ensures it's within the rolling window
-  if (daysSinceRecordDate >= 0 && daysSinceRecordDate <= 6) {
+  // daysSinceRecordDate <= editTimeLimit ensures it's within the rolling window
+  if (daysSinceRecordDate >= 0 && daysSinceRecordDate <= editTimeLimit) {
     result.canEdit = true;
     result.canDelete = true;
   }
@@ -82,6 +80,13 @@ export function isAdmin(user: Employee): boolean {
 }
 
 /**
+ * Checks if user has inspection privileges
+ */
+export function isInspection(user: Employee): boolean {
+  return user.role === 'Inspection';
+}
+
+/**
  * Checks if user can manage other users
  */
 export function canManageUsers(user: Employee): boolean {
@@ -89,10 +94,24 @@ export function canManageUsers(user: Employee): boolean {
 }
 
 /**
- * Checks if user can view all data
+ * Checks if user can view all data (Admin and Inspection can view all timesheet data)
  */
 export function canViewAllData(user: Employee): boolean {
-  return user.role === 'Admin';
+  return user.role === 'Admin' || user.role === 'Inspection';
+}
+
+/**
+ * Checks if user can edit timesheet entries (Admin and Users only, not Inspection)
+ */
+export function canEditTimesheets(user: Employee): boolean {
+  return user.role === 'Admin' || user.role === 'User';
+}
+
+/**
+ * Checks if user should have timesheet entry forms (Users only)
+ */
+export function shouldShowTimesheetEntry(user: Employee): boolean {
+  return user.role === 'User';
 }
 
 /**
@@ -104,6 +123,8 @@ export function getRoleDisplayName(role: UserRole): string {
       return 'Admin';
     case 'User':
       return 'User';
+    case 'Inspection':
+      return 'Inspection';
     default:
       return 'Unknown';
   }
@@ -113,5 +134,5 @@ export function getRoleDisplayName(role: UserRole): string {
  * Validates if a role is valid
  */
 export function isValidRole(role: string): role is UserRole {
-  return role === 'Admin' || role === 'User';
+  return role === 'Admin' || role === 'User' || role === 'Inspection';
 }

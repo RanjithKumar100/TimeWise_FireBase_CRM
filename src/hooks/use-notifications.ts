@@ -11,6 +11,15 @@ export interface MissingLogDate {
   daysAgo: number;
 }
 
+export interface UserNotification {
+  id: string;
+  type: string;
+  message: string;
+  date: string;
+  isRead: boolean;
+  data: any;
+}
+
 interface NotificationState {
   dismissedNotifications: string[];
   lastChecked: string;
@@ -19,6 +28,7 @@ interface NotificationState {
 export function useNotifications() {
   const { user } = useAuth();
   const [missingDates, setMissingDates] = useState<MissingLogDate[]>([]);
+  const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
 
@@ -63,6 +73,28 @@ export function useNotifications() {
     }
   }, [getStorageKey]);
 
+  const fetchUserNotifications = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/api/notifications/user?limit=20&unreadOnly=true', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data?.notifications) {
+          setUserNotifications(data.data.notifications);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user notifications:', error);
+    }
+  }, [user]);
+
   const checkMissingLogs = useCallback(async () => {
     if (!user) return;
 
@@ -104,12 +136,15 @@ export function useNotifications() {
         const filteredMissing = missing.filter(m => !dismissedNotifications.has(m.date));
         setMissingDates(filteredMissing);
       }
+      
+      // Also fetch user notifications
+      await fetchUserNotifications();
     } catch (error) {
       console.error('Error checking missing logs:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, dismissedNotifications]);
+  }, [user, dismissedNotifications, fetchUserNotifications]);
 
   const dismissNotification = useCallback((date: string) => {
     const newDismissed = new Set(dismissedNotifications);
@@ -120,18 +155,85 @@ export function useNotifications() {
     setMissingDates(prev => prev.filter(d => d.date !== date));
   }, [dismissedNotifications, saveDismissedNotifications]);
 
-  const clearAllNotifications = useCallback(() => {
-    const allDates = new Set([...dismissedNotifications, ...missingDates.map(d => d.date)]);
-    setDismissedNotifications(allDates);
-    saveDismissedNotifications(allDates);
-    setMissingDates([]);
-  }, [dismissedNotifications, missingDates, saveDismissedNotifications]);
+  const dismissUserNotification = useCallback(async (notificationId: string) => {
+    try {
+      // Call API to mark notification as read/dismissed
+      await fetch('/api/notifications/user', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        },
+        body: JSON.stringify({ 
+          notificationIds: [notificationId], 
+          markAsRead: true 
+        })
+      });
+
+      // Remove from local state
+      setUserNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (error) {
+      console.error('Error dismissing user notification:', error);
+    }
+  }, []);
+
+  const clearAllNotifications = useCallback(async () => {
+    try {
+      // Clear missing dates notifications
+      const allDates = new Set([...dismissedNotifications, ...missingDates.map(d => d.date)]);
+      setDismissedNotifications(allDates);
+      saveDismissedNotifications(allDates);
+      setMissingDates([]);
+
+      // Clear user notifications
+      if (userNotifications.length > 0) {
+        const userNotificationIds = userNotifications.map(n => n.id);
+        await fetch('/api/notifications/user', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+          },
+          body: JSON.stringify({ 
+            notificationIds: userNotificationIds, 
+            markAsRead: true 
+          })
+        });
+        setUserNotifications([]);
+      }
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+    }
+  }, [dismissedNotifications, missingDates, userNotifications, saveDismissedNotifications]);
 
   const refreshNotifications = useCallback(() => {
     if (user) {
       checkMissingLogs();
     }
   }, [user, checkMissingLogs]);
+
+  // Auto-refresh notifications every 10 seconds and on page focus
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(() => {
+      refreshNotifications();
+    }, 10000); // 10 seconds for reasonable responsiveness
+
+    // Also refresh when user returns to the page
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshNotifications();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, refreshNotifications]);
 
   // Initialize
   useEffect(() => {
@@ -148,9 +250,11 @@ export function useNotifications() {
 
   return {
     missingDates,
+    userNotifications,
     loading,
-    notificationCount: missingDates.length,
+    notificationCount: missingDates.length + userNotifications.length,
     dismissNotification,
+    dismissUserNotification,
     clearAllNotifications,
     refreshNotifications
   };

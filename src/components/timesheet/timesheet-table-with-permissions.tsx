@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Edit2, Trash2, Clock, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Edit2, Trash2, Clock, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { canEditTimesheetEntry, filterTimesheetEntriesForUser, getRoleDisplayName } from '@/lib/permissions';
 import { useAuth } from '@/hooks/use-auth';
 import type { TimesheetEntry, Employee } from '@/lib/types';
+import { formatTimeSpent } from '@/lib/time-utils';
 
 interface TimesheetTableProps {
   entries: TimesheetEntry[];
@@ -32,6 +33,7 @@ export default function TimesheetTableWithPermissions({
 }: TimesheetTableProps) {
   const { user, isAdmin } = useAuth();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [permanentDeleteConfirmId, setPermanentDeleteConfirmId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const entriesPerPage = 10; // Show 10 entries per page
 
@@ -46,14 +48,25 @@ export default function TimesheetTableWithPermissions({
   }, [entries, user, showAllUsers, isAdmin]);
 
   const totalPages = Math.ceil(allFilteredEntries.length / entriesPerPage);
-  const startIndex = (currentPage - 1) * entriesPerPage;
+  // Ensure currentPage is within valid bounds
+  const safePage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  const startIndex = (safePage - 1) * entriesPerPage;
   const endIndex = startIndex + entriesPerPage;
   const paginatedEntries = allFilteredEntries.slice(startIndex, endIndex);
 
-  // Reset to page 1 when entries change
+  // Smart pagination: only reset to page 1 when current page becomes invalid
   React.useEffect(() => {
-    setCurrentPage(1);
-  }, [allFilteredEntries.length]);
+    const newTotalPages = Math.ceil(allFilteredEntries.length / entriesPerPage);
+    // If current page is now beyond the available pages, go to the last available page
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+    // Only reset to page 1 if there are no entries at all
+    else if (allFilteredEntries.length === 0) {
+      setCurrentPage(1);
+    }
+    // Otherwise, stay on the current page
+  }, [allFilteredEntries.length, currentPage, entriesPerPage]);
 
   const getEmployeeName = (employeeId: string) => {
     const employee = employees.find(emp => emp.id === employeeId);
@@ -99,11 +112,11 @@ export default function TimesheetTableWithPermissions({
             <TooltipTrigger>
               <Badge variant="secondary" className="text-xs">
                 <Clock className="w-3 h-3 mr-1" />
-                {permissions.editTimeRemaining}d left
+                Editable
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Can edit for {permissions.editTimeRemaining} more days</p>
+              <p>Can edit this entry</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -141,8 +154,16 @@ export default function TimesheetTableWithPermissions({
     onDelete(entryId);
   };
 
+  const handlePermanentDelete = (entryId: string) => {
+    setPermanentDeleteConfirmId(null);
+    // Let the parent handle the permanent deletion
+    onDelete(entryId);
+  };
+
   const canUserEdit = (entry: TimesheetEntry) => {
     if (!user) return false;
+    // Rejected entries cannot be edited
+    if (entry.status === 'rejected') return false;
     // Admin can edit any entry, users need permission check
     if (isAdmin()) return true;
     const permissions = getPermissionStatus(entry);
@@ -151,6 +172,8 @@ export default function TimesheetTableWithPermissions({
 
   const canUserDelete = (entry: TimesheetEntry) => {
     if (!user) return false;
+    // Rejected entries cannot be deleted again
+    if (entry.status === 'rejected') return false;
     // Admin can delete any entry, users need permission check
     if (isAdmin()) return true;
     const permissions = getPermissionStatus(entry);
@@ -194,15 +217,19 @@ export default function TimesheetTableWithPermissions({
                 <TableHead>Verticle</TableHead>
                 <TableHead>Country</TableHead>
                 <TableHead>Task</TableHead>
-                <TableHead>Hours</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Time Spent</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedEntries.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-medium">
+                <TableRow 
+                  key={entry.id} 
+                  className={entry.status === 'rejected' ? 'opacity-60 bg-red-50 dark:bg-red-950/20' : ''}
+                >
+                  <TableCell className={`font-medium ${entry.status === 'rejected' ? 'line-through' : ''}`}>
                     {format(entry.date, 'MMM dd, yyyy')}
                   </TableCell>
                   {showAllUsers && isAdmin() && (
@@ -218,14 +245,25 @@ export default function TimesheetTableWithPermissions({
                   <TableCell>
                     <Badge variant="outline">{entry.verticle}</Badge>
                   </TableCell>
-                  <TableCell>{entry.country}</TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={entry.task}>
+                  <TableCell className={entry.status === 'rejected' ? 'line-through' : ''}>{entry.country}</TableCell>
+                  <TableCell className={`max-w-[200px] truncate ${entry.status === 'rejected' ? 'line-through' : ''}`} title={entry.task}>
                     {entry.task}
                   </TableCell>
-                  <TableCell>{entry.hours}h</TableCell>
+                  <TableCell className={`max-w-[300px] truncate ${entry.status === 'rejected' ? 'line-through' : ''}`} title={entry.taskDescription || 'No description'}>
+                    {entry.taskDescription || 'No description'}
+                  </TableCell>
+                  <TableCell className={`font-mono ${entry.status === 'rejected' ? 'line-through opacity-60' : ''}`}>
+                    {(entry as any).timeHours !== undefined && (entry as any).timeMinutes !== undefined
+                      ? formatTimeSpent((entry as any).timeHours, (entry as any).timeMinutes)
+                      : formatTimeSpent(entry.hours)
+                    }
+                  </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="text-xs">
-                      Approved
+                    <Badge 
+                      variant={entry.status === 'rejected' ? 'destructive' : 'secondary'} 
+                      className="text-xs"
+                    >
+                      {entry.status === 'rejected' ? 'Rejected' : 'Approved'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -244,41 +282,80 @@ export default function TimesheetTableWithPermissions({
                       
                       {/* Only show delete button in admin view (when showAllUsers is true) */}
                       {showAllUsers && (
-                        <AlertDialog 
-                          open={deleteConfirmId === entry.id} 
-                          onOpenChange={(open) => !open && setDeleteConfirmId(null)}
-                        >
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setDeleteConfirmId(entry.id)}
-                              disabled={!canUserDelete(entry)}
-                              className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                              title="Delete entry"
+                        <>
+                          {entry.status !== 'rejected' ? (
+                            <AlertDialog 
+                              open={deleteConfirmId === entry.id} 
+                              onOpenChange={(open) => !open && setDeleteConfirmId(null)}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Time Entry</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
-                                This action cannot be undone and will permanently remove the entry from the database.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDelete(entry.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete Entry
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setDeleteConfirmId(entry.id)}
+                                  disabled={!canUserDelete(entry)}
+                                  className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                  title="Reject entry"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Reject Time Entry</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to reject this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
+                                    The entry will be marked as rejected and will remain visible with a crossed-out appearance for audit purposes.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(entry.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Reject Entry
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : (
+                            <AlertDialog 
+                              open={permanentDeleteConfirmId === entry.id} 
+                              onOpenChange={(open) => !open && setPermanentDeleteConfirmId(null)}
+                            >
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setPermanentDeleteConfirmId(entry.id)}
+                                  className="h-8 w-8 p-0 hover:bg-red-600 hover:text-white"
+                                  title="Permanently delete rejected entry"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Permanently Delete Entry</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to permanently delete this rejected entry for {format(entry.date, 'MMM dd, yyyy')}? 
+                                    This action cannot be undone and will completely remove the entry from the database.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handlePermanentDelete(entry.id)}
+                                    className="bg-red-600 text-white hover:bg-red-700"
+                                  >
+                                    Permanently Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </>
                       )}
                     </div>
                   </TableCell>
@@ -299,19 +376,19 @@ export default function TimesheetTableWithPermissions({
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
+                disabled={safePage === 1}
                 className="h-8 w-8 p-0"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="text-sm font-medium">
-                Page {currentPage} of {totalPages}
+                Page {safePage} of {totalPages}
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                disabled={safePage === totalPages}
                 className="h-8 w-8 p-0"
               >
                 <ChevronRight className="h-4 w-4" />

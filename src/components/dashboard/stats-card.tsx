@@ -11,7 +11,7 @@ interface StatsCardProps {
 
 export default function StatsCard({ title, value, icon: Icon, className }: StatsCardProps) {
   return (
-    <Card className={cn("shadow-sm hover:shadow-md transition-shadow", className)}>
+    <Card className={cn("shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         <Icon className="h-4 w-4 text-muted-foreground" />

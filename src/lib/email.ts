@@ -18,7 +18,7 @@ interface EmailOptions {
 }
 
 class EmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter!: nodemailer.Transporter;
   private isConfigured: boolean = false;
 
   constructor() {
@@ -198,7 +198,7 @@ class EmailService {
             </div>
             
             <div class="alert">
-              <p class="urgency">⏳ Time Remaining: ${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left to enter your timesheet data!</p>
+              <p class="urgency">⏰ Please enter your missing timesheet data as soon as possible!</p>
               ${daysRemaining <= 2 ? '<p><strong>⚠️ URGENT:</strong> Please submit your entries as soon as possible to avoid deadline expiration.</p>' : ''}
             </div>
             
@@ -218,7 +218,7 @@ class EmailService {
             
             <h3>Important Reminders:</h3>
             <ul>
-              <li>You can only edit entries within 6 days of the work date</li>
+              <li>You can only edit entries within 3 days of the work date</li>
               <li>Maximum 24 hours can be logged per day</li>
               <li>All entries must be submitted before the deadline expires</li>
             </ul>
@@ -242,13 +242,13 @@ Hello ${userName},
 You have missing timesheet entries for the following dates:
 ${missingDatesText}
 
-Time Remaining: ${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left to enter your data!
+Please enter your missing timesheet data as soon as possible!
 
 Please log into the TimeWise system and complete your timesheet entries as soon as possible.
 
 Login at: ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'}/dashboard/user
 
-Important: You can only edit entries within 6 days of the work date.
+Important: You can only edit entries within 3 days of the work date.
 
 This is an automated reminder from the TimeWise system.
     `;
@@ -256,9 +256,10 @@ This is an automated reminder from the TimeWise system.
     return { subject, html, text };
   }
 
-  generateWelcomeEmail(userName: string, userEmail: string, password: string, role: 'Admin' | 'User'): { subject: string; html: string; text: string } {
+  generateWelcomeEmail(userName: string, userEmail: string, password: string, role: 'Admin' | 'User' | 'Inspection'): { subject: string; html: string; text: string } {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://192.168.1.43:9002';
     const isAdmin = role === 'Admin';
+    const isInspection = role === 'Inspection';
     
     const subject = `🎉 Welcome to TimeWise - Your Account Has Been Created!`;
     
@@ -328,16 +329,19 @@ This is an automated reminder from the TimeWise system.
             <ol>
               <li><strong>Login:</strong> Use the credentials above to access your account</li>
               <li><strong>Explore:</strong> Familiarize yourself with the dashboard and features</li>
-              ${isAdmin 
+              ${isAdmin
                 ? `<li><strong>Manage Users:</strong> Access admin panel to manage team members and timesheets</li>
                    <li><strong>Configure Settings:</strong> Set up system preferences and notification settings</li>`
+                : isInspection
+                ? `<li><strong>Monitor Compliance:</strong> Access inspection dashboard to view timesheet compliance</li>
+                   <li><strong>Review Reports:</strong> Check team compliance rates and missing entries</li>`
                 : `<li><strong>Start Logging:</strong> Begin tracking your daily work hours and tasks</li>
-                   <li><strong>Review Guidelines:</strong> Check the 6-day editing window and submission requirements</li>`
+                   <li><strong>Review Guidelines:</strong> Check the 3-day editing window and submission requirements</li>`
               }
               <li><strong>Change Password:</strong> Update your password in Settings for enhanced security</li>
             </ol>
             
-            <h3>🎯 ${isAdmin ? 'Admin Features Available:' : 'User Features Available:'}</h3>
+            <h3>🎯 ${isAdmin ? 'Admin Features Available:' : isInspection ? 'Inspection Features Available:' : 'User Features Available:'}</h3>
             <ul>
               ${isAdmin
                 ? `<li>👥 User Management - Create and manage team accounts</li>
@@ -345,8 +349,14 @@ This is an automated reminder from the TimeWise system.
                    <li>📧 Notification Management - Configure email reminders</li>
                    <li>🔧 System Settings - Manage application preferences</li>
                    <li>📝 Full Timesheet Access - View and edit all user entries</li>`
+                : isInspection
+                ? `<li>🔍 Compliance Monitoring - View team timesheet completion rates</li>
+                   <li>📅 Calendar View - Visual inspection of individual user timesheets</li>
+                   <li>📊 Compliance Reports - Track missing entries and submission patterns</li>
+                   <li>🚨 Compliance Alerts - Identify users with low completion rates</li>
+                   <li>👀 User Search - Quickly find and inspect specific team members</li>`
                 : `<li>⏰ Time Tracking - Log daily work hours and tasks</li>
-                   <li>📅 Calendar View - Manage entries within 6-day editing window</li>
+                   <li>📅 Calendar View - Manage entries within 3-day editing window</li>
                    <li>📊 Personal Reports - View your timesheet history</li>
                    <li>🔔 Smart Notifications - Get reminders for missing entries</li>
                    <li>📱 Multi-device Access - Use from any device on the network</li>`
@@ -391,7 +401,7 @@ What's Next:
 
 ${isAdmin 
   ? 'As an Admin, you have full access to user management, system analytics, and notification settings.'
-  : 'As a User, you can track time, manage entries within the 6-day window, and view personal reports.'
+  : 'As a User, you can track time, manage entries within the 3-day window, and view personal reports.'
 }
 
 Need help? Contact your system administrator or refer to the help section in the application.

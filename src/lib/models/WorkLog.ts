@@ -1,14 +1,42 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import Leave from './Leave';
+import fs from 'fs';
+import path from 'path';
+
+// Helper function to read system config
+const readSystemConfig = () => {
+  try {
+    const configFilePath = path.join(process.cwd(), 'system-config.json');
+    if (fs.existsSync(configFilePath)) {
+      const data = fs.readFileSync(configFilePath, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error reading system config in WorkLog model:', error);
+  }
+  
+  // Return default config if file doesn't exist or error occurs
+  return {
+    editTimeLimit: 3, // Default 3 days for backward compatibility
+    allowPastDateEntry: true,
+    allowFutureDate: false
+  };
+};
 
 export interface IWorkLog extends Document {
   logId: string;
   userId: string;
+  userName: string;          // Store user name for historical records
+  userEmail: string;         // Store user email for historical records
+  userRole: string;          // Store user role for historical records
   date: Date;
   verticle: 'CMIS' | 'TRI' | 'LOF' | 'TRG';
   country: string;
   task: string;
-  hoursSpent: number;
+  taskDescription: string;
+  hours: number;             // Hours part (0-24)
+  minutes: number;           // Minutes part (0-59)
+  status: 'approved' | 'rejected'; // Entry status - approved by default, rejected when "deleted"
   createdAt: Date;
   updatedAt: Date;
   canEdit(currentUserId: string, currentUserRole: string): boolean;
@@ -32,6 +60,27 @@ const WorkLogSchema: Schema = new Schema(
       required: [true, 'User ID is required'],
       ref: 'User',
     },
+    userName: {
+      type: String,
+      required: [true, 'User name is required'],
+      trim: true,
+      maxlength: [100, 'User name cannot exceed 100 characters'],
+    },
+    userEmail: {
+      type: String,
+      required: [true, 'User email is required'],
+      trim: true,
+      lowercase: true,
+      maxlength: [100, 'User email cannot exceed 100 characters'],
+    },
+    userRole: {
+      type: String,
+      required: [true, 'User role is required'],
+      enum: {
+        values: ['Admin', 'User'],
+        message: 'User role must be either Admin or User',
+      },
+    },
     date: {
       type: Date,
       required: [true, 'Date is required'],
@@ -52,15 +101,40 @@ const WorkLogSchema: Schema = new Schema(
     },
     task: {
       type: String,
-      required: [true, 'Task description is required'],
+      required: [true, 'Task name is required'],
       trim: true,
-      maxlength: [500, 'Task description cannot exceed 500 characters'],
+      maxlength: [200, 'Task name cannot exceed 200 characters'],
     },
-    hoursSpent: {
+    taskDescription: {
+      type: String,
+      required: false, // Optional in DB for backward compatibility 
+      default: '',
+      trim: true,
+      maxlength: [1000, 'Task description cannot exceed 1000 characters']
+      // Remove validation here - we'll handle it in the API layer
+    },
+    hours: {
       type: Number,
-      required: [true, 'Hours spent is required'],
-      min: [0.5, 'Minimum hours is 0.5'],
-      max: [24, 'Maximum hours per entry is 24'],
+      required: [true, 'Hours are required'],
+      min: [0, 'Hours cannot be negative'],
+      max: [24, 'Hours cannot exceed 24'],
+      default: 0,
+    },
+    minutes: {
+      type: Number,
+      required: [true, 'Minutes are required'],
+      min: [0, 'Minutes cannot be negative'],
+      max: [59, 'Minutes cannot exceed 59'],
+      default: 0,
+    },
+    status: {
+      type: String,
+      required: [true, 'Status is required'],
+      enum: {
+        values: ['approved', 'rejected'],
+        message: 'Status must be either approved or rejected',
+      },
+      default: 'approved',
     },
   },
   {
@@ -74,26 +148,38 @@ WorkLogSchema.index({ createdAt: -1 });
 WorkLogSchema.index({ verticle: 1, date: -1 });
 WorkLogSchema.index({ userId: 1, createdAt: -1 });
 
-// Helper function to validate 6-day window for data entry
+// Virtual property to calculate decimal hours for calculations (backward compatibility)
+WorkLogSchema.virtual('hoursSpent').get(function () {
+  const hours = (this as any).hours || 0;
+  const minutes = (this as any).minutes || 0;
+  return Math.round((hours + (minutes / 60)) * 100) / 100;
+});
+
+// Helper function to validate time window for data entry (configurable)
 WorkLogSchema.statics.validateSixDayWindow = function (recordDate: Date, userRole: string): { isValid: boolean; message?: string } {
   // Admin can create entries for any date
   if (userRole === 'Admin') {
     return { isValid: true };
   }
   
-  const now = new Date();
-  const sixDaysAgo = new Date();
-  sixDaysAgo.setDate(now.getDate() - 6);
+  // Get system config for edit time limit
+  const systemConfig = readSystemConfig();
+  const editTimeLimit = systemConfig.editTimeLimit || 3; // Default to 3 days
   
-  // Users can only create entries within the rolling 6-day window
-  if (recordDate < sixDaysAgo) {
+  const now = new Date();
+  const limitDaysAgo = new Date();
+  limitDaysAgo.setDate(now.getDate() - editTimeLimit);
+  
+  // Users can only create entries within the configurable rolling window
+  if (recordDate < limitDaysAgo) {
     return {
       isValid: false,
-      message: 'You can only enter/edit data within the last 6 days.'
+      message: `You can only enter/edit data within the last ${editTimeLimit} days.`
     };
   }
   
-  if (recordDate > now) {
+  // Check future date restrictions from system config
+  if (recordDate > now && !systemConfig.allowFutureDate) {
     return {
       isValid: false,
       message: 'You cannot create entries for future dates.'
@@ -134,13 +220,15 @@ WorkLogSchema.methods.canEdit = function (currentUserId: string, currentUserRole
     return false;
   }
   
-  // Check rolling 6-day window based on record date
+  // Check rolling window based on record date (uses system config)
+  const systemConfig = readSystemConfig();
+  const editTimeLimit = systemConfig.editTimeLimit || 3; // Default to 3 days
   const now = new Date();
   const recordDate = new Date(this.date);
   const daysDifference = Math.floor((now.getTime() - recordDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  // Rolling 6-day window: can edit if record date is within last 6 days (including today)
-  return daysDifference >= 0 && daysDifference <= 6;
+
+  // Rolling edit window: can edit if record date is within the configured time limit (including today)
+  return daysDifference >= 0 && daysDifference <= editTimeLimit;
 };
 
 // Virtual for calculating days since record date
@@ -150,15 +238,6 @@ WorkLogSchema.virtual('daysSinceRecordDate').get(function () {
   return Math.floor((now.getTime() - recordDate.getTime()) / (1000 * 60 * 60 * 24));
 });
 
-// Virtual for edit time remaining (for users) - rolling 6-day window from record date
-WorkLogSchema.virtual('editTimeRemaining').get(function () {
-  const daysSince = this.daysSinceRecordDate as number;
-  // Only return remaining days if within the valid window (0-6 days)
-  if (daysSince >= 0 && daysSince <= 6) {
-    return Math.max(0, 6 - daysSince);
-  }
-  return 0; // No time remaining if outside the window
-});
 
 // Ensure virtual fields are serialized
 WorkLogSchema.set('toJSON', { virtuals: true });

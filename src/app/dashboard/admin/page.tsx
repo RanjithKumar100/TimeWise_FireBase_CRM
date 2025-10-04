@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Employee } from '@/lib/types';
+import type { Employee, Verticle } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,6 @@ import CalendarView from '@/components/timesheet/calendar-view';
 import TeamSummary from '@/components/reports/team-summary';
 import StatsCard from '@/components/dashboard/stats-card';
 import ManageUsers from '@/components/admin/manage-users';
-import TimesheetForm from '@/components/timesheet/timesheet-form';
 import NotificationManagement from '@/components/admin/notification-management';
 import LeaveManagement from '@/components/admin/leave-management';
 import { ConditionalDataLoader } from '@/components/ui/database-status';
@@ -32,10 +31,12 @@ import { ConditionalDataLoader } from '@/components/ui/database-status';
 interface WorkLogEntry {
   id: string;
   date: Date;
-  verticle: string;
+  verticle: Verticle;
   country: string;
   task: string;
+  taskDescription?: string;
   hours: number;
+  status?: 'approved' | 'rejected';
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
@@ -117,7 +118,7 @@ export default function AdminDashboardPage() {
       
       // Filter admin's own entries
       if (user) {
-        const adminLogs = logs.filter((log: WorkLogEntry) => log.employeeId === user.userId);
+        const adminLogs = logs.filter((log: WorkLogEntry) => log.employeeId === user.id);
         setAdminEntries(adminLogs);
       }
     } catch (error) {
@@ -151,7 +152,7 @@ export default function AdminDashboardPage() {
     if (!userSearchQuery.trim()) return [];
     return users.filter(user => 
       user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      user.email?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
       user.role.toLowerCase().includes(userSearchQuery.toLowerCase())
     ).slice(0, 8); // Show max 8 suggestions
   }, [users, userSearchQuery]);
@@ -179,7 +180,7 @@ export default function AdminDashboardPage() {
 
     // Also filter admin entries for month selection
     if (user) {
-      let adminFiltered = allWorkLogs.filter((log: WorkLogEntry) => log.employeeId === user.userId);
+      let adminFiltered = allWorkLogs.filter((log: WorkLogEntry) => log.employeeId === user.id);
       
       // Filter by month
       if (selectedMonth !== 'all') {
@@ -196,31 +197,56 @@ export default function AdminDashboardPage() {
 
   // Export to Excel
   const exportToExcel = () => {
-    const exportData = workLogs.map(log => ({
-      'Date': log.date.toLocaleDateString(),
-      'Employee': log.employeeName,
-      'Email': log.employeeEmail,
-      'Role': log.employeeRole,
-      'Verticle': log.verticle,
-      'Country': log.country,
-      'Task': log.task,
-      'Hours': log.hours,
-      'Created At': log.createdAt.toLocaleDateString()
-    }));
+    const exportData = workLogs.map(log => {
+      // Get hours and minutes values
+      const hours = log.timeHours || Math.floor(log.hours || 0);
+      const minutes = log.timeMinutes || Math.round(((log.hours || 0) % 1) * 60);
+
+      // Convert to Excel time format (decimal fraction of a day)
+      // Excel time format: hours/24 + minutes/(24*60)
+      const excelTimeValue = (hours + minutes/60) / 24;
+
+      return {
+        'Date': log.date.toLocaleDateString(),
+        'Employee': log.employeeName,
+        'Email': log.employeeEmail,
+        'Role': log.employeeRole,
+        'Verticle': log.verticle,
+        'Country': log.country,
+        'Task': log.task,
+        'Time Spent': excelTimeValue,
+        'Created At': log.createdAt.toLocaleDateString()
+      };
+    });
 
     // Add extra time summary per employee
     const uniqueEmployees = [...new Set(workLogs.map(log => log.employeeId))];
     const extraTimeData = uniqueEmployees.map(employeeId => {
       const employee = users.find(u => u.id === employeeId);
+      const extraTime = calculateEmployeeExtraTime(workLogs, employeeId);
+
       return {
         'Employee': employee?.name || 'Unknown',
         'Email': employee?.email || 'N/A',
-        'Total Extra Time': formatExtraTime(calculateEmployeeExtraTime(workLogs, employeeId))
+        'Total Extra Time': formatExtraTime(extraTime)
       };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const extraTimeSheet = XLSX.utils.json_to_sheet(extraTimeData);
+
+    // Apply time formatting to the 'Time Spent' column
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    const timeColumnIndex = 7; // 'Time Spent' is the 8th column (0-indexed: 7)
+
+    // Format the Time Spent column as time
+    for (let row = 1; row <= range.e.r; row++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: timeColumnIndex });
+      if (worksheet[cellAddress]) {
+        worksheet[cellAddress].z = '[h]:mm'; // Excel time format showing hours:minutes
+      }
+    }
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Team Work Logs');
     XLSX.utils.book_append_sheet(workbook, extraTimeSheet, 'Extra Time Summary');
@@ -289,7 +315,9 @@ export default function AdminDashboardPage() {
             verticle: newEntry.verticle,
             country: newEntry.country,
             task: newEntry.task,
-            hoursSpent: newEntry.hours,
+            taskDescription: newEntry.taskDescription || '',
+            hours: newEntry.hours,
+            minutes: newEntry.minutes,
           }),
         });
 
@@ -317,7 +345,7 @@ export default function AdminDashboardPage() {
         );
         
         // Update admin entries if this is admin's entry
-        if (user && updatedLog.employeeId === user.userId) {
+        if (user && updatedLog.employeeId === user.id) {
           setAdminEntries(prevLogs => 
             prevLogs.map(log => 
               log.id === editingEntry.id ? updatedLog : log
@@ -343,7 +371,9 @@ export default function AdminDashboardPage() {
             verticle: newEntry.verticle,
             country: newEntry.country,
             task: newEntry.task,
-            hoursSpent: newEntry.hours,
+            taskDescription: newEntry.taskDescription || '',
+            hours: newEntry.hours,
+            minutes: newEntry.minutes,
           }),
         });
 
@@ -363,7 +393,7 @@ export default function AdminDashboardPage() {
         setAllWorkLogs(prevLogs => [newLog, ...prevLogs]);
         
         // Add to admin entries if this is admin's entry
-        if (user && newLog.employeeId === user.userId) {
+        if (user && newLog.employeeId === user.id) {
           setAdminEntries(prevLogs => [newLog, ...prevLogs]);
         }
 
@@ -388,16 +418,37 @@ export default function AdminDashboardPage() {
 
   const handleDeleteEntry = async (entryId: string) => {
     try {
-      const response = await fetch(`/api/worklogs/${entryId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
-        }
-      });
+      // Find the entry to determine if it's already rejected
+      const entry = workLogs.find(log => log.id === entryId);
+      
+      let response;
+      let successMessage = "Work log rejected successfully";
+      
+      if (entry?.status === 'rejected') {
+        // If already rejected, permanently delete
+        response = await fetch(`/api/worklogs/${entryId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+          },
+          body: JSON.stringify({ action: 'permanent_delete' })
+        });
+        successMessage = "Work log permanently deleted successfully";
+      } else {
+        // If approved, reject it (soft delete)
+        response = await fetch(`/api/worklogs/${entryId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+          }
+        });
+        successMessage = "Work log rejected successfully";
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete work log');
+        throw new Error(errorData.message || 'Failed to process work log');
       }
 
       // Refresh the work logs to get the updated status from server
@@ -405,13 +456,13 @@ export default function AdminDashboardPage() {
       
       toast({
         title: "Success", 
-        description: "Work log deleted successfully",
+        description: successMessage,
       });
     } catch (error: any) {
       console.error('Delete work log error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete work log",
+        description: error.message || "Failed to process work log",
         variant: "destructive",
       });
     }
@@ -420,6 +471,7 @@ export default function AdminDashboardPage() {
   const handleCancelEdit = () => {
     setEditingEntry(null);
   };
+
 
   const handleUserSelect = (user: Employee) => {
     setSelectedUser(user);
@@ -536,7 +588,7 @@ export default function AdminDashboardPage() {
               <Input
                 id="user-search"
                 type="text"
-                placeholder="Search by name, email, or role..."
+                placeholder="Search by name, email or role."
                 value={userSearchQuery}
                 onChange={handleSearchInputChange}
                 onFocus={() => userSearchQuery.trim() && setShowSuggestions(true)}
@@ -593,7 +645,7 @@ export default function AdminDashboardPage() {
           </div>
           <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2">
             <Download className="h-4 w-4" />
-            Export to Excel ({workLogs.length} entries)
+            Export to Excel
           </Button>
         </div>
       </div>
@@ -615,7 +667,11 @@ export default function AdminDashboardPage() {
         </TabsList>
         
         <TabsContent value="team-summary" className="mt-4">
-          <TeamSummary entries={workLogs} employees={users} />
+          <TeamSummary 
+            entries={workLogs} 
+            employees={users} 
+            preSelectedUserId={selectedUser?.id}
+          />
         </TabsContent>
 
         <TabsContent value="all-entries" className="mt-4">

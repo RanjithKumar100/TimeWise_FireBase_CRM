@@ -101,10 +101,6 @@ export function DatabaseStatusIndicator({
   // Compact indicator for header
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className={`w-2 h-2 rounded-full ${getStatusColor(dbStatus.status)}`} />
-      <span className="text-xs text-muted-foreground hidden sm:inline">
-        DB: {getStatusText(dbStatus.status)}
-      </span>
       {!isConnected && (
         <Button
           variant="ghost"

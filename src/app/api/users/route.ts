@@ -5,7 +5,7 @@ import AuditLog from '@/lib/models/AuditLog';
 import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
 import emailService from '@/lib/email';
 
-// GET /api/users - Get all users (Admin only)
+// GET /api/users - Get all users (Admin and Inspection access)
 export async function GET(request: NextRequest) {
   try {
     await dbConnect();
@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Authentication required', 401);
     }
 
-    if (authUser.role !== 'Admin') {
-      return createErrorResponse('Admin access required', 403);
+    if (authUser.role !== 'Admin' && authUser.role !== 'Inspection') {
+      return createErrorResponse('Admin or Inspection access required', 403);
     }
 
     const { searchParams } = new URL(request.url);
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     
     // Optional filters
     const roleFilter = searchParams.get('role');
-    if (roleFilter && ['Admin', 'User'].includes(roleFilter)) {
+    if (roleFilter && ['Admin', 'User', 'Inspection'].includes(roleFilter)) {
       query.role = roleFilter;
     }
 
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Password must be at least 6 characters long', 400);
     }
 
-    if (!['Admin', 'User'].includes(role)) {
+    if (!['Admin', 'User', 'Inspection'].includes(role)) {
       return createErrorResponse('Invalid role specified', 400);
     }
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
           user.name, 
           user.email, 
           password, // Send the original plain password
-          user.role as 'Admin' | 'User'
+          user.role as 'Admin' | 'User' | 'Inspection'
         );
         
         const emailSent = await emailService.sendEmail({

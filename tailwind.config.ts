@@ -10,9 +10,13 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
-        code: ['monospace'],
+        sans: ['Poppins', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'sans-serif'],
+        body: ['Poppins', 'system-ui', 'sans-serif'],
+        headline: ['Poppins', 'system-ui', 'sans-serif'],
+        sidebar: ['Poppins', 'system-ui', 'sans-serif'],
+        display: ['Poppins', 'system-ui', 'sans-serif'],
+        futuristic: ['Orbitron', 'monospace'],
+        code: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',

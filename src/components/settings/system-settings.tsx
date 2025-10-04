@@ -20,7 +20,6 @@ import {
   Save,
   RefreshCw,
   Database,
-  Clock,
   Users,
   Shield,
   AlertTriangle,
@@ -29,13 +28,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 interface SystemConfig {
-  // Work Log Settings
-  maxHoursPerDay: number;
-  maxHoursPerWeek: number;
-  editTimeLimit: number; // in days
-  allowPastDateEntry: boolean;
-  allowFutureDate: boolean;
-  
   // User Management
   defaultUserRole: 'User' | 'Admin';
   requireEmailVerification: boolean;
@@ -48,11 +40,6 @@ interface SystemConfig {
   maintenanceMode: boolean;
   maintenanceMessage: string;
   
-  // Business Rules
-  workingDaysPerWeek: number;
-  standardWorkingHours: number;
-  overtimeThreshold: number;
-  
   // Available Options
   availableVerticles: string[];
   availableCountries: string[];
@@ -60,13 +47,6 @@ interface SystemConfig {
 }
 
 const defaultConfig: SystemConfig = {
-  // Work Log Settings
-  maxHoursPerDay: 12,
-  maxHoursPerWeek: 60,
-  editTimeLimit: 2,
-  allowPastDateEntry: true,
-  allowFutureDate: false,
-  
   // User Management
   defaultUserRole: 'User',
   requireEmailVerification: false,
@@ -78,11 +58,6 @@ const defaultConfig: SystemConfig = {
   systemDescription: 'Comprehensive time tracking and management portal',
   maintenanceMode: false,
   maintenanceMessage: 'System is under maintenance. Please check back later.',
-  
-  // Business Rules
-  workingDaysPerWeek: 5,
-  standardWorkingHours: 8,
-  overtimeThreshold: 40,
   
   // Available Options
   availableVerticles: ['CMIS', 'TRI', 'LOF', 'TRG'],
@@ -111,6 +86,31 @@ export default function SystemSettings() {
   const [newVerticle, setNewVerticle] = useState('');
   const [newCountry, setNewCountry] = useState('');
   const [newTask, setNewTask] = useState('');
+
+  const fetchSystemConfig = async () => {
+    try {
+      const response = await fetch('/api/system-config', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Update the entire config with data from server, preserving defaults for missing values
+        setConfig(prev => ({
+          ...prev,
+          ...result.data
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch system config:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSystemConfig();
+  }, []);
 
   const handleConfigChange = (key: keyof SystemConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -143,15 +143,27 @@ export default function SystemSettings() {
     try {
       setLoading(true);
       
-      // Simulate API call - In real implementation, this would save to database
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Success",
-        description: "System configuration saved successfully",
+      const response = await fetch('/api/system-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        },
+        body: JSON.stringify(config)
       });
-      
-      setHasChanges(false);
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "System configuration saved successfully",
+        });
+        setHasChanges(false);
+        
+        // Notify other components that system config has been updated
+        window.dispatchEvent(new CustomEvent('systemConfigUpdated'));
+      } else {
+        throw new Error('Failed to save configuration');
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -257,95 +269,6 @@ export default function SystemSettings() {
           </CardContent>
         </Card>
 
-        {/* Work Log Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              Work Log Settings
-            </CardTitle>
-            <CardDescription>
-              Configure work logging rules and restrictions
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="max-hours-day">Max Hours per Day</Label>
-                <Input
-                  id="max-hours-day"
-                  type="number"
-                  min="1"
-                  max="24"
-                  value={config.maxHoursPerDay}
-                  onChange={(e) => handleConfigChange('maxHoursPerDay', Number(e.target.value))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="max-hours-week">Max Hours per Week</Label>
-                <Input
-                  id="max-hours-week"
-                  type="number"
-                  min="1"
-                  max="168"
-                  value={config.maxHoursPerWeek}
-                  onChange={(e) => handleConfigChange('maxHoursPerWeek', Number(e.target.value))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-time-limit">Edit Time Limit (days)</Label>
-                <Input
-                  id="edit-time-limit"
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={config.editTimeLimit}
-                  onChange={(e) => handleConfigChange('editTimeLimit', Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Users can edit entries within this time limit. Admins can always edit.
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="overtime-threshold">Overtime Threshold (hours/week)</Label>
-                <Input
-                  id="overtime-threshold"
-                  type="number"
-                  min="20"
-                  max="60"
-                  value={config.overtimeThreshold}
-                  onChange={(e) => handleConfigChange('overtimeThreshold', Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Allow Past Date Entry</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Allow users to log work for past dates
-                  </p>
-                </div>
-                <Switch
-                  checked={config.allowPastDateEntry}
-                  onCheckedChange={(checked) => handleConfigChange('allowPastDateEntry', checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Allow Future Date Entry</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Allow users to log work for future dates
-                  </p>
-                </div>
-                <Switch
-                  checked={config.allowFutureDate}
-                  onCheckedChange={(checked) => handleConfigChange('allowFutureDate', checked)}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* User Management Settings */}
         <Card>

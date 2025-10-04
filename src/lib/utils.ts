@@ -19,6 +19,7 @@ export function downloadDataAsExcel(entries: TimesheetEntry[], employees: Employ
     'Verticle': entry.verticle,
     'Country': entry.country,
     'Task': entry.task,
+    'Task Description': entry.taskDescription,
     'Hours': entry.hours,
   }));
 

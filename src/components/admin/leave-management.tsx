@@ -196,7 +196,7 @@ export default function LeaveManagement() {
         <div>
           <h2 className="text-2xl font-bold">Leave Management</h2>
           <p className="text-muted-foreground">
-            Manage company leave dates. No timesheet notifications will be sent on these days.
+            Manage company leave dates.
           </p>
         </div>
         
@@ -378,15 +378,6 @@ export default function LeaveManagement() {
           </Card>
         </div>
       )}
-
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Important:</strong> Leave dates prevent timesheet notification emails from being sent 
-          and exclude those days from missing entry reports. Users can still manually enter timesheets 
-          for leave days if needed.
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }

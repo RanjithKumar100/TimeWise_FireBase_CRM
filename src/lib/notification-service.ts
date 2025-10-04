@@ -4,6 +4,26 @@ import WorkLog from './models/WorkLog';
 import NotificationLog from './models/NotificationLog';
 import Leave from './models/Leave';
 import { emailService } from './email';
+import fs from 'fs';
+import path from 'path';
+
+// Helper function to read system config
+const readSystemConfig = () => {
+  try {
+    const configFilePath = path.join(process.cwd(), 'system-config.json');
+    if (fs.existsSync(configFilePath)) {
+      const data = fs.readFileSync(configFilePath, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error reading system config in notification service:', error);
+  }
+
+  // Return default config if file doesn't exist or error occurs
+  return {
+    editTimeLimit: 3, // Default 3 days
+  };
+};
 
 interface MissingEntryInfo {
   userId: string;
@@ -55,12 +75,14 @@ class NotificationService {
   }
 
   /**
-   * Calculate days remaining for a given date based on the 6-day rule
+   * Calculate days remaining for a given date based on the system edit time limit
    */
   private calculateDaysRemaining(workDate: Date): number {
+    const systemConfig = readSystemConfig();
+    const editTimeLimit = systemConfig.editTimeLimit || 3; // Default to 3 days
     const now = new Date();
     const daysDifference = Math.floor((now.getTime() - workDate.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(0, 6 - daysDifference);
+    return Math.max(0, editTimeLimit - daysDifference);
   }
 
   /**
@@ -79,24 +101,26 @@ class NotificationService {
 
       const missingEntriesInfo: MissingEntryInfo[] = [];
 
-      // Define the date range for checking (last 6 business days)
+      // Define the date range for checking (based on system edit time limit)
+      const systemConfig = readSystemConfig();
+      const editTimeLimit = systemConfig.editTimeLimit || 3; // Default to 3 days
       const today = new Date();
-      const sixDaysAgo = new Date();
-      sixDaysAgo.setDate(today.getDate() - 6);
+      const limitDaysAgo = new Date();
+      limitDaysAgo.setDate(today.getDate() - editTimeLimit);
       
       // Special focus on yesterday for immediate notification
       const yesterday = new Date();
       yesterday.setDate(today.getDate() - 1);
 
       for (const user of users) {
-        // Get business days in the last 6 days (excluding leave dates)
-        const businessDays = await this.getBusinessDays(sixDaysAgo, today);
+        // Get business days in the configured time limit (excluding leave dates)
+        const businessDays = await this.getBusinessDays(limitDaysAgo, today);
         
         // Get existing work logs for this user in the date range
         const existingLogs = await WorkLog.find({
           userId: user.userId,
-          date: { 
-            $gte: sixDaysAgo, 
+          date: {
+            $gte: limitDaysAgo, 
             $lte: today 
           }
         }).lean();

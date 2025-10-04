@@ -4,22 +4,14 @@ function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
+    const port = window.location.port || '9002';
     
-    // For development, use localhost if we're on localhost
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:9002';
-    }
-    
-    // If accessing via IP or network address, use the same for API
-    return `${protocol}//${hostname}:9002`;
+    // Use the same protocol, hostname, and port as the current page
+    return `${protocol}//${hostname}:${port}`;
   }
   
   // Server side: check environment variable first
   if (process.env.NEXT_PUBLIC_API_URL) {
-    // But avoid using 'timewise' hostname which might not resolve
-    if (process.env.NEXT_PUBLIC_API_URL.includes('timewise')) {
-      return 'http://localhost:9002';
-    }
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
@@ -178,7 +170,7 @@ class ApiClient {
     return response;
   }
 
-  async register(name: string, email: string, password: string, role: 'Admin' | 'User' = 'User') {
+  async register(name: string, email: string, password: string, role: 'Admin' | 'User' | 'Inspection' = 'User') {
     const response = await this.request<{ user: any }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ name, email, password, role }),
@@ -247,7 +239,9 @@ class ApiClient {
     verticle: string;
     country: string;
     task: string;
-    hoursSpent: number;
+    taskDescription: string;
+    hours: number;
+    minutes: number;
   }) {
     return this.request<{ workLog: any }>('/worklogs', {
       method: 'POST',
@@ -260,7 +254,9 @@ class ApiClient {
     verticle: string;
     country: string;
     task: string;
-    hoursSpent: number;
+    taskDescription: string;
+    hours: number;
+    minutes: number;
   }>) {
     return this.request<{ workLog: any }>(`/worklogs/${id}`, {
       method: 'PUT',
@@ -300,7 +296,7 @@ class ApiClient {
     name: string;
     email: string;
     password: string;
-    role: 'Admin' | 'User';
+    role: 'Admin' | 'User' | 'Inspection';
     isActive?: boolean;
   }) {
     return this.request<{ user: any }>('/users', {
@@ -313,7 +309,7 @@ class ApiClient {
     name: string;
     email: string;
     password: string;
-    role: 'Admin' | 'User';
+    role: 'Admin' | 'User' | 'Inspection';
     isActive: boolean;
   }>) {
     return this.request<{ user: any }>(`/users/${id}`, {

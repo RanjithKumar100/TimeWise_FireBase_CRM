@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IPasswordResetToken extends Document {
   tokenId: string;
@@ -10,6 +10,12 @@ export interface IPasswordResetToken extends Document {
   usedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  markAsUsed(): Promise<void>;
+}
+
+export interface IPasswordResetTokenModel extends Model<IPasswordResetToken> {
+  createResetToken(userId: string, userEmail: string): Promise<IPasswordResetToken>;
+  findValidToken(token: string): Promise<IPasswordResetToken | null>;
 }
 
 const PasswordResetTokenSchema: Schema = new Schema(
@@ -111,15 +117,15 @@ PasswordResetTokenSchema.methods.markAsUsed = async function(): Promise<void> {
 
 // Virtual to check if token is expired
 PasswordResetTokenSchema.virtual('isExpired').get(function () {
-  return new Date() > this.expiresAt;
+  return new Date() > (this as any).expiresAt;
 });
 
 // Virtual to check if token is valid
 PasswordResetTokenSchema.virtual('isValid').get(function () {
-  return !this.used && !this.isExpired;
+  return !(this as any).used && !(this as any).isExpired;
 });
 
 // Ensure virtual fields are serialized
 PasswordResetTokenSchema.set('toJSON', { virtuals: true });
 
-export default mongoose.models.PasswordResetToken || mongoose.model<IPasswordResetToken>('PasswordResetToken', PasswordResetTokenSchema);
+export default (mongoose.models.PasswordResetToken as IPasswordResetTokenModel) || mongoose.model<IPasswordResetToken, IPasswordResetTokenModel>('PasswordResetToken', PasswordResetTokenSchema);

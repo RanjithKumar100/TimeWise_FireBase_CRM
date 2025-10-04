@@ -59,7 +59,7 @@ export default function SummaryChart({ data }: SummaryChartProps) {
               {data.map((item, index) => (
                 <Cell 
                   key={`${item.verticle}-${index}`} 
-                  fill={chartConfig[item.verticle as keyof typeof chartConfig]?.color || verticleColors.CMIS} 
+                  fill={(chartConfig[item.verticle as keyof typeof chartConfig] as any)?.color || verticleColors.CMIS} 
                 />
               ))}
             </Bar>

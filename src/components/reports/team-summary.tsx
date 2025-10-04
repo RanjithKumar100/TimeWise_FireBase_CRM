@@ -14,12 +14,18 @@ import { verticleColors } from '@/lib/colors';
 interface TeamSummaryProps {
   entries: TimesheetEntry[];
   employees: Employee[];
+  preSelectedUserId?: string | null;
 }
 
 const verticles: Verticle[] = ['CMIS', 'TRI', 'LOF', 'TRG'];
 
-export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+export default function TeamSummary({ entries, employees, preSelectedUserId }: TeamSummaryProps) {
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(preSelectedUserId || 'all');
+
+  // Update selection when preSelectedUserId changes
+  React.useEffect(() => {
+    setSelectedEmployeeId(preSelectedUserId || 'all');
+  }, [preSelectedUserId]);
 
   const selectedEntries = useMemo(() => {
     if (selectedEmployeeId === 'all') {
@@ -27,6 +33,10 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
     }
     return entries.filter(entry => entry.employeeId === selectedEmployeeId);
   }, [entries, selectedEmployeeId]);
+
+  const selectedEmployee = useMemo(() => {
+    return selectedEmployeeId === 'all' ? null : employees.find(emp => emp.id === selectedEmployeeId);
+  }, [selectedEmployeeId, employees]);
   
   const handleDownload = () => {
     const fileName = selectedEmployeeId === 'all' 
@@ -52,13 +62,17 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
   const teamOverallData = useMemo(() => {
     const employeeData = new Map<string, { name: string, hoursByVerticle: Map<Verticle, number>, total: number, extraTime: number, employeeId: string }>();
 
-    employees.forEach(emp => {
+    // Filter employees based on selection
+    const relevantEmployees = selectedEmployeeId === 'all' ? employees : employees.filter(emp => emp.id === selectedEmployeeId);
+    
+    relevantEmployees.forEach(emp => {
         const verticleMap = new Map<Verticle, number>();
         verticles.forEach(v => verticleMap.set(v, 0));
         employeeData.set(emp.id, { name: emp.name, hoursByVerticle: verticleMap, total: 0, extraTime: 0, employeeId: emp.id });
     });
 
-    entries.forEach(entry => {
+    // Use selectedEntries instead of all entries to match the filter
+    selectedEntries.forEach(entry => {
         const empData = employeeData.get(entry.employeeId);
         if (empData) {
             empData.hoursByVerticle.set(entry.verticle, (empData.hoursByVerticle.get(entry.verticle) || 0) + entry.hours);
@@ -68,19 +82,26 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
 
     // Calculate extra time for each employee
     employeeData.forEach((empData, employeeId) => {
-        empData.extraTime = calculateEmployeeExtraTime(entries, employeeId);
+        empData.extraTime = calculateEmployeeExtraTime(selectedEntries, employeeId);
     });
 
     return Array.from(employeeData.values());
-  }, [entries, employees]);
+  }, [selectedEntries, employees, selectedEmployeeId]);
   
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Team Member Drilldown</CardTitle>
-          <CardDescription>Select a team member to see their individual summary or download their data.</CardDescription>
+          <CardTitle>
+            {selectedEmployee ? `${selectedEmployee.name}'s Drilldown` : 'Team Member Drilldown'}
+          </CardTitle>
+          <CardDescription>
+            {selectedEmployee 
+              ? `Individual summary and data for ${selectedEmployee.name}`
+              : 'Select a team member to see their summary and download their data.'
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-wrap gap-4 items-center">
@@ -105,8 +126,15 @@ export default function TeamSummary({ entries, employees }: TeamSummaryProps) {
       </Card>
       <Card>
         <CardHeader>
-            <CardTitle>Team Overall Hours</CardTitle>
-            <CardDescription>Total hours per verticle for each team member.</CardDescription>
+            <CardTitle>
+              {selectedEmployee ? `${selectedEmployee.name}'s Overall Hours` : 'Team Overall Hours'}
+            </CardTitle>
+            <CardDescription>
+              {selectedEmployee 
+                ? `Total hours per verticle for ${selectedEmployee.name}`
+                : 'Total hours per verticle for each team member.'
+              }
+            </CardDescription>
         </CardHeader>
         <CardContent>
             <div className="rounded-md border">

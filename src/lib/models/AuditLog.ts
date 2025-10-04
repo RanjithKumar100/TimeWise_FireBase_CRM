@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IAuditLog extends Document {
   logId: string;
@@ -16,6 +16,22 @@ export interface IAuditLog extends Document {
   ipAddress?: string;
   userAgent?: string;
   createdAt: Date;
+}
+
+export interface IAuditLogModel extends Model<IAuditLog> {
+  createLog(logData: {
+    action: string;
+    entityType: string;
+    entityId: string;
+    performedBy: string;
+    performedByName: string;
+    performedByRole: string;
+    oldValues?: Record<string, any>;
+    newValues?: Record<string, any>;
+    additionalInfo?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<IAuditLog | null>;
 }
 
 const AuditLogSchema: Schema = new Schema(
@@ -124,4 +140,4 @@ AuditLogSchema.statics.createLog = async function(logData: {
   }
 };
 
-export default mongoose.models.AuditLog || mongoose.model<IAuditLog>('AuditLog', AuditLogSchema);
+export default (mongoose.models.AuditLog as IAuditLogModel) || mongoose.model<IAuditLog, IAuditLogModel>('AuditLog', AuditLogSchema);
