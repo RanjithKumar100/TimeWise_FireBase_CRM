@@ -16,12 +16,13 @@ interface IndividualSummaryProps {
   employees: Employee[];
 }
 
-const verticles: Verticle[] = ['CMIS', 'TRI', 'LOF', 'TRG'];
-
 export default function IndividualSummary({ entries, employees }: IndividualSummaryProps) {
   const aggregatedData = useMemo<AggregatedVerticleData[]>(() => {
     const dataMap = new Map<Verticle, number>();
-    verticles.forEach(v => dataMap.set(v, 0));
+
+    // Get unique verticles from entries dynamically
+    const uniqueVerticles = Array.from(new Set(entries.map(entry => entry.verticle)));
+    uniqueVerticles.forEach(v => dataMap.set(v, 0));
 
     entries.forEach(entry => {
       dataMap.set(entry.verticle, (dataMap.get(entry.verticle) || 0) + entry.hours);

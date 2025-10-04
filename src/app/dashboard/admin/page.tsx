@@ -36,6 +36,8 @@ interface WorkLogEntry {
   task: string;
   taskDescription?: string;
   hours: number;
+  timeHours?: number;
+  timeMinutes?: number;
   status?: 'approved' | 'rejected';
   employeeId: string;
   employeeName: string;

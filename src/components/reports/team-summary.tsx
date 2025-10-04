@@ -17,8 +17,6 @@ interface TeamSummaryProps {
   preSelectedUserId?: string | null;
 }
 
-const verticles: Verticle[] = ['CMIS', 'TRI', 'LOF', 'TRG'];
-
 export default function TeamSummary({ entries, employees, preSelectedUserId }: TeamSummaryProps) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(preSelectedUserId || 'all');
 
@@ -37,10 +35,16 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
   const selectedEmployee = useMemo(() => {
     return selectedEmployeeId === 'all' ? null : employees.find(emp => emp.id === selectedEmployeeId);
   }, [selectedEmployeeId, employees]);
-  
+
+  // Get unique verticles from all entries dynamically
+  const verticles = useMemo(() => {
+    const uniqueVerticles = Array.from(new Set(entries.map(entry => entry.verticle)));
+    return uniqueVerticles.sort(); // Sort alphabetically
+  }, [entries]);
+
   const handleDownload = () => {
-    const fileName = selectedEmployeeId === 'all' 
-      ? 'all-team-timesheet' 
+    const fileName = selectedEmployeeId === 'all'
+      ? 'all-team-timesheet'
       : `${employees.find(e => e.id === selectedEmployeeId)?.name}-timesheet` || 'individual-timesheet';
     downloadDataAsExcel(selectedEntries, employees, fileName);
   };
@@ -57,14 +61,14 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
       verticle,
       totalHours,
     }));
-  }, [selectedEntries]);
+  }, [selectedEntries, verticles]);
 
   const teamOverallData = useMemo(() => {
     const employeeData = new Map<string, { name: string, hoursByVerticle: Map<Verticle, number>, total: number, extraTime: number, employeeId: string }>();
 
     // Filter employees based on selection
     const relevantEmployees = selectedEmployeeId === 'all' ? employees : employees.filter(emp => emp.id === selectedEmployeeId);
-    
+
     relevantEmployees.forEach(emp => {
         const verticleMap = new Map<Verticle, number>();
         verticles.forEach(v => verticleMap.set(v, 0));
@@ -86,7 +90,7 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
     });
 
     return Array.from(employeeData.values());
-  }, [selectedEntries, employees, selectedEmployeeId]);
+  }, [selectedEntries, employees, selectedEmployeeId, verticles]);
   
 
   return (

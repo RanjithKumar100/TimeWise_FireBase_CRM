@@ -30,7 +30,7 @@ export interface IWorkLog extends Document {
   userEmail: string;         // Store user email for historical records
   userRole: string;          // Store user role for historical records
   date: Date;
-  verticle: 'CMIS' | 'TRI' | 'LOF' | 'TRG';
+  verticle: string;          // Dynamic verticle from system config
   country: string;
   task: string;
   taskDescription: string;
@@ -88,10 +88,9 @@ const WorkLogSchema: Schema = new Schema(
     verticle: {
       type: String,
       required: [true, 'Verticle is required'],
-      enum: {
-        values: ['CMIS', 'TRI', 'LOF', 'TRG'],
-        message: 'Verticle must be one of: CMIS, TRI, LOF, TRG',
-      },
+      trim: true,
+      maxlength: [50, 'Verticle name cannot exceed 50 characters'],
+      // Removed enum to allow dynamic verticles from system config
     },
     country: {
       type: String,

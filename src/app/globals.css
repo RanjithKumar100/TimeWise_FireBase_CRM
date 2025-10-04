@@ -170,3 +170,16 @@
     background: linear-gradient(135deg, transparent 0%, hsl(215 25% 15% / 0.3) 100%);
   }
 }
+
+/* Hide Next.js development tools indicator */
+@layer utilities {
+  .dev-tools-indicator,
+  [class*="dev-tools-indicator"],
+  [data-nextjs-dev-tools],
+  [data-nextjs-toast-wrapper] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}

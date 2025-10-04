@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
 
     // Optional filters
     const verticleFilter = searchParams.get('verticle');
-    if (verticleFilter && ['CMIS', 'TRI', 'LOF', 'TRG'].includes(verticleFilter)) {
+    if (verticleFilter) {
+      // No validation needed for filter - just use what's provided
       query.verticle = verticleFilter;
     }
 
@@ -204,7 +205,11 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Task description must contain at least 3 words', 400);
     }
 
-    if (!['CMIS', 'TRI', 'LOF', 'TRG'].includes(verticle)) {
+    // Get system config for validation
+    const systemConfig = readSystemConfig();
+
+    // Validate verticle against system config
+    if (!systemConfig.availableVerticles || !systemConfig.availableVerticles.includes(verticle)) {
       return createErrorResponse('Invalid verticle specified', 400);
     }
 
@@ -219,9 +224,6 @@ export async function POST(request: NextRequest) {
 
     // Calculate total time in decimal hours for validation
     const convertedHours = Math.round((finalHours + (finalMinutes / 60)) * 100) / 100;
-
-    // Get system config for validation
-    const systemConfig = readSystemConfig();
 
     // Validate minimum time (30 minutes)
     const totalMinutes = (finalHours * 60) + finalMinutes;

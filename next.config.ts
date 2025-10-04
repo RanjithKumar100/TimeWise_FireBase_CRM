@@ -2,6 +2,7 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  reactStrictMode: false, // Disable strict mode to reduce dev warnings
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -20,6 +21,12 @@ const nextConfig: NextConfig = {
   },
   // Production server configuration
   serverExternalPackages: ['mongoose'],
+
+  // Disable development indicators
+  devIndicators: {
+    buildActivity: false,
+    buildActivityPosition: 'bottom-right',
+  },
   
   // Allow cross-origin requests from network devices
   async headers() {

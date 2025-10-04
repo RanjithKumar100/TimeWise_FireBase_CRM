@@ -1,4 +1,4 @@
-export type Verticle = 'CMIS' | 'TRI' | 'LOF' | 'TRG';
+export type Verticle = string;
 
 export type UserRole = 'Admin' | 'User' | 'Inspection';
 

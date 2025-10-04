@@ -22,8 +22,6 @@ import type { TimesheetEntry, Employee } from '@/lib/types';
 import { formatDateForAPI } from '@/lib/date-utils';
 
 
-const verticles = ['CMIS', 'TRI', 'LOF', 'TRG'] as const;
-
 // Default task options (will be configurable by admin later)
 const defaultTaskOptions: ComboboxOption[] = [
   { value: 'Video Editing', label: 'Video Editing' },
@@ -38,9 +36,15 @@ const defaultTaskOptions: ComboboxOption[] = [
   { value: 'Client Communication', label: 'Client Communication' },
 ];
 
-const formSchema = z.object({
+// Default verticles (fallback)
+const defaultVerticles = ['CMIS', 'TRI', 'LOF', 'TRG'];
+
+// Create form schema function that accepts dynamic verticles
+const createFormSchema = (availableVerticles: string[]) => z.object({
   date: z.date({ required_error: 'A date is required.' }),
-  verticle: z.enum(verticles, { required_error: 'Please select a verticle.' }),
+  verticle: z.string().refine((val) => availableVerticles.includes(val), {
+    message: 'Please select a valid verticle.',
+  }),
   country: z.string().min(2, 'Country must be at least 2 characters.'),
   task: z.string().min(3, 'Task name is required.'),
   taskDescription: z.string()
@@ -61,7 +65,15 @@ const formSchema = z.object({
   path: ['hours'] // Show error on hours field
 });
 
-type TimesheetFormValues = z.infer<typeof formSchema>;
+type TimesheetFormValues = {
+  date: Date;
+  verticle: string;
+  country: string;
+  task: string;
+  taskDescription: string;
+  hours: number;
+  minutes: number;
+};
 
 interface TimesheetFormProps {
   onSave: (data: Omit<TimesheetEntry, 'id' | 'employeeId' | 'createdAt' | 'updatedAt'> & { taskDescription: string; hours: number; minutes: number }) => void;
@@ -78,8 +90,10 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
   const [dailyHours, setDailyHours] = useState(0);
   const [dailyHoursLoaded, setDailyHoursLoaded] = useState(false);
   const [taskOptions, setTaskOptions] = useState<ComboboxOption[]>(defaultTaskOptions);
+  const [availableVerticles, setAvailableVerticles] = useState<string[]>(defaultVerticles);
   const [dailyHoursTarget, setDailyHoursTarget] = useState(8);
   const [editTimeLimit, setEditTimeLimit] = useState(3);
+  const [formSchema, setFormSchema] = useState(() => createFormSchema(defaultVerticles));
 
   const fetchSystemConfig = async () => {
     try {
@@ -91,12 +105,21 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
 
       if (response.ok) {
         const result = await response.json();
+
+        // Update task options
         const taskOptions = result.data.availableTasks.map((task: string) => ({
           value: task,
           label: task
         }));
         setTaskOptions(taskOptions);
-        
+
+        // Update available verticles
+        if (result.data.availableVerticles && result.data.availableVerticles.length > 0) {
+          setAvailableVerticles(result.data.availableVerticles);
+          setFormSchema(createFormSchema(result.data.availableVerticles));
+          console.log('🔄 Updated available verticles:', result.data.availableVerticles);
+        }
+
         // Update daily hours target from system config (use maxHoursPerDay as the daily target)
         setDailyHoursTarget(result.data.maxHoursPerDay || result.data.standardWorkingHours || 8);
         setEditTimeLimit(result.data.editTimeLimit || 3);
@@ -419,7 +442,7 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {verticles.map((v) => (
+                      {availableVerticles.map((v) => (
                         <SelectItem key={v} value={v}>{v}</SelectItem>
                       ))}
                     </SelectContent>

@@ -131,7 +131,9 @@ export async function PUT(
 
     // Validation
     if (verticle) {
-      if (!['CMIS', 'TRI', 'LOF', 'TRG'].includes(verticle)) {
+      // Get system config for verticle validation
+      const systemConfig = readSystemConfig();
+      if (!systemConfig.availableVerticles || !systemConfig.availableVerticles.includes(verticle)) {
         return createErrorResponse('Invalid verticle specified', 400);
       }
       workLog.verticle = verticle;
