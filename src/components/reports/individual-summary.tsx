@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { downloadDataAsExcel } from '@/lib/utils';
 import { verticleColors } from '@/lib/colors';
+import { formatTimeSpent } from '@/lib/time-utils';
 
 
 interface IndividualSummaryProps {
@@ -18,24 +19,44 @@ interface IndividualSummaryProps {
 
 export default function IndividualSummary({ entries, employees }: IndividualSummaryProps) {
   const aggregatedData = useMemo<AggregatedVerticleData[]>(() => {
-    const dataMap = new Map<Verticle, number>();
+    const dataMap = new Map<Verticle, { hours: number; minutes: number }>();
 
     // Get unique verticles from entries dynamically
     const uniqueVerticles = Array.from(new Set(entries.map(entry => entry.verticle)));
-    uniqueVerticles.forEach(v => dataMap.set(v, 0));
+    uniqueVerticles.forEach(v => dataMap.set(v, { hours: 0, minutes: 0 }));
 
     entries.forEach(entry => {
-      dataMap.set(entry.verticle, (dataMap.get(entry.verticle) || 0) + entry.hours);
+      const current = dataMap.get(entry.verticle) || { hours: 0, minutes: 0 };
+      const hours = (entry as any).timeHours ?? Math.floor(entry.hours);
+      const minutes = (entry as any).timeMinutes ?? Math.round((entry.hours - Math.floor(entry.hours)) * 60);
+
+      const totalMinutes = (current.hours * 60 + current.minutes) + (hours * 60 + minutes);
+      dataMap.set(entry.verticle, {
+        hours: Math.floor(totalMinutes / 60),
+        minutes: totalMinutes % 60
+      });
     });
 
-    return Array.from(dataMap.entries()).map(([verticle, totalHours]) => ({
+    return Array.from(dataMap.entries()).map(([verticle, time]) => ({
       verticle,
-      totalHours,
+      totalHours: time.hours + (time.minutes / 60), // Keep decimal for chart compatibility
+      displayTime: formatTimeSpent(time.hours, time.minutes),
     }));
   }, [entries]);
 
-  const totalHours = useMemo(() => {
-    return entries.reduce((sum, entry) => sum + entry.hours, 0);
+  const totalTime = useMemo(() => {
+    const totalMinutes = entries.reduce((sum, entry) => {
+      const hours = (entry as any).timeHours ?? Math.floor(entry.hours);
+      const minutes = (entry as any).timeMinutes ?? Math.round((entry.hours - Math.floor(entry.hours)) * 60);
+      return sum + (hours * 60) + minutes;
+    }, 0);
+
+    return {
+      hours: Math.floor(totalMinutes / 60),
+      minutes: totalMinutes % 60,
+      display: formatTimeSpent(Math.floor(totalMinutes / 60), totalMinutes % 60),
+      decimal: Math.floor(totalMinutes / 60) + (totalMinutes % 60) / 60
+    };
   }, [entries]);
   
   const handleDownload = () => {
@@ -63,27 +84,27 @@ export default function IndividualSummary({ entries, employees }: IndividualSumm
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {aggregatedData.map(({ verticle, totalHours: verticleHours }) => (
-                  <TableRow key={verticle}>
+                {aggregatedData.map((item) => (
+                  <TableRow key={item.verticle}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-sm" 
-                          style={{ backgroundColor: verticleColors[verticle as keyof typeof verticleColors] }}
+                        <div
+                          className="w-3 h-3 rounded-sm"
+                          style={{ backgroundColor: verticleColors[item.verticle as keyof typeof verticleColors] }}
                         ></div>
-                        {verticle}
+                        {item.verticle}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">{verticleHours.toFixed(1)}</TableCell>
+                    <TableCell className="text-right">{(item as any).displayTime}</TableCell>
                     <TableCell className="text-right">
-                      {totalHours > 0 ? ((verticleHours / totalHours) * 100).toFixed(1) : 0}%
+                      {totalTime.decimal > 0 ? ((item.totalHours / totalTime.decimal) * 100).toFixed(1) : 0}%
                     </TableCell>
                   </TableRow>
                 ))}
                  <TableRow className="font-bold bg-secondary">
                     <TableCell>Total</TableCell>
-                    <TableCell className="text-right">{totalHours.toFixed(1)}</TableCell>
-                    <TableCell className="text-right">{totalHours > 0 ? '100.0%' : '0.0%'}</TableCell>
+                    <TableCell className="text-right">{totalTime.display}</TableCell>
+                    <TableCell className="text-right">{totalTime.decimal > 0 ? '100.0%' : '0.0%'}</TableCell>
                   </TableRow>
               </TableBody>
             </Table>

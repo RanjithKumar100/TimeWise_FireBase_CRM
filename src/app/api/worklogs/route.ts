@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
     // Users can only see their own work logs, Admins and Inspection can see all (unless personalOnly is requested)
     if ((authUser.role !== 'Admin' && authUser.role !== 'Inspection') || personalOnly) {
       query.userId = authUser.userId;
-      // Users can see their own entries regardless of status (approved or rejected)
+      // Users should NOT see their rejected entries (they disappear from view)
+      query.$or = [
+        { status: 'approved' },
+        { status: { $exists: false } }
+      ];
     } else {
       // Admins and Inspection viewing all users should only see approved entries
       query.$or = [

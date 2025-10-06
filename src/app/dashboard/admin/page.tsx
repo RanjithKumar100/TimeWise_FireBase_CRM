@@ -96,6 +96,28 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Sort entries: Today's entries first, then others in reverse chronological order
+  const sortEntriesByDate = (entries: WorkLogEntry[]) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todayEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() === today.getTime();
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const otherEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() !== today.getTime();
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return [...todayEntries, ...otherEntries];
+  };
+
   const fetchWorkLogs = async () => {
     try {
       const response = await fetch('/api/worklogs?limit=1000', {
@@ -115,12 +137,16 @@ export default function AdminDashboardPage() {
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
       }));
-      setAllWorkLogs(logs);
-      setWorkLogs(logs);
-      
+
+      // Sort: Today's entries first, then others
+      const sortedLogs = sortEntriesByDate(logs);
+
+      setAllWorkLogs(sortedLogs);
+      setWorkLogs(sortedLogs);
+
       // Filter admin's own entries
       if (user) {
-        const adminLogs = logs.filter((log: WorkLogEntry) => log.employeeId === user.id);
+        const adminLogs = sortedLogs.filter((log: WorkLogEntry) => log.employeeId === user.id);
         setAdminEntries(adminLogs);
       }
     } catch (error) {
@@ -178,7 +204,9 @@ export default function AdminDashboardPage() {
       filtered = filtered.filter(log => log.employeeId === selectedUser.id);
     }
 
-    setWorkLogs(filtered);
+    // Sort: Today's entries first, then others
+    const sortedFiltered = sortEntriesByDate(filtered);
+    setWorkLogs(sortedFiltered);
 
     // Also filter admin entries for month selection
     if (user) {
@@ -491,31 +519,70 @@ export default function AdminDashboardPage() {
     const value = e.target.value;
     setUserSearchQuery(value);
     setShowSuggestions(value.trim().length > 0);
-    
+
     // If user clears the input, clear the selection
     if (!value.trim()) {
       setSelectedUser(null);
     }
   };
 
+  const handleTeamSummaryUserSelect = (userId: string | null) => {
+    if (userId) {
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        setSelectedUser(user);
+        setUserSearchQuery(user.name);
+      }
+    } else {
+      setSelectedUser(null);
+      setUserSearchQuery('');
+    }
+  };
+
   const totalHoursThisMonth = useMemo(() => {
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    return workLogs
-      .filter(entry => entry.date > oneMonthAgo)
-      .reduce((sum, entry) => sum + entry.hours, 0);
-  }, [workLogs]);
+
+    // Filter by selected user if any
+    let filteredLogs = workLogs.filter(entry => entry.date > oneMonthAgo);
+    console.log('📊 Admin Stats - Selected User:', selectedUser?.name || 'All Team');
+    console.log('📊 Admin Stats - Work logs before filter:', filteredLogs.length);
+
+    if (selectedUser) {
+      filteredLogs = filteredLogs.filter(entry => entry.employeeId === selectedUser.id);
+      console.log('📊 Admin Stats - Work logs after user filter:', filteredLogs.length);
+    }
+
+    // Calculate total time in minutes, then convert to hours/minutes
+    const totalMinutes = filteredLogs.reduce((sum, entry) => {
+      const hours = (entry as any).timeHours ?? Math.floor(entry.hours);
+      const minutes = (entry as any).timeMinutes ?? Math.round((entry.hours - Math.floor(entry.hours)) * 60);
+      return sum + (hours * 60) + minutes;
+    }, 0);
+
+    const result = {
+      hours: Math.floor(totalMinutes / 60),
+      minutes: totalMinutes % 60,
+      display: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+    };
+
+    console.log('📊 Admin Stats - Total Hours Display:', result.display);
+    return result;
+  }, [workLogs, selectedUser]);
 
   const projectsThisMonth = useMemo(() => {
      const oneMonthAgo = new Date();
      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-     const projects = new Set(
-       workLogs
-         .filter(entry => entry.date > oneMonthAgo)
-         .map(entry => entry.verticle)
-     );
+
+     // Filter by selected user if any
+     let filteredLogs = workLogs.filter(entry => entry.date > oneMonthAgo);
+     if (selectedUser) {
+       filteredLogs = filteredLogs.filter(entry => entry.employeeId === selectedUser.id);
+     }
+
+     const projects = new Set(filteredLogs.map(entry => entry.verticle));
      return projects.size;
-  }, [workLogs]);
+  }, [workLogs, selectedUser]);
 
   const lockedEntries = useMemo(() => {
     return workLogs.filter(entry => !entry.canEdit).length;
@@ -524,17 +591,22 @@ export default function AdminDashboardPage() {
   const totalExtraTimeThisMonth = useMemo(() => {
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    const recentWorkLogs = workLogs.filter(entry => entry.date > oneMonthAgo);
-    
+
+    // Filter by selected user if any
+    let recentWorkLogs = workLogs.filter(entry => entry.date > oneMonthAgo);
+    if (selectedUser) {
+      recentWorkLogs = recentWorkLogs.filter(entry => entry.employeeId === selectedUser.id);
+    }
+
     let totalExtraTime = 0;
     const uniqueEmployees = [...new Set(recentWorkLogs.map(entry => entry.employeeId))];
-    
+
     uniqueEmployees.forEach(employeeId => {
       totalExtraTime += calculateEmployeeExtraTime(recentWorkLogs, employeeId);
     });
-    
+
     return totalExtraTime;
-  }, [workLogs]);
+  }, [workLogs, selectedUser]);
 
   if (!user || user.role !== 'Admin' || loading) {
     return <div className="flex h-full w-full items-center justify-center"><p>Loading admin dashboard...</p></div>;
@@ -653,7 +725,7 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <StatsCard title="Total Hours (Month)" value={totalHoursThisMonth.toFixed(1)} icon={Clock} />
+        <StatsCard title="Total Hours (Month)" value={totalHoursThisMonth.display} icon={Clock} />
         <StatsCard title="Projects (Month)" value={projectsThisMonth} icon={Hourglass} />
         <StatsCard title="Team Size" value={users.filter(emp => emp.isActive).length} icon={Users} />
         <StatsCard title="Extra Time (Month)" value={formatExtraTime(totalExtraTimeThisMonth)} icon={Timer} />
@@ -669,10 +741,11 @@ export default function AdminDashboardPage() {
         </TabsList>
         
         <TabsContent value="team-summary" className="mt-4">
-          <TeamSummary 
-            entries={workLogs} 
-            employees={users} 
+          <TeamSummary
+            entries={workLogs}
+            employees={users}
             preSelectedUserId={selectedUser?.id}
+            onUserSelect={handleTeamSummaryUserSelect}
           />
         </TabsContent>
 

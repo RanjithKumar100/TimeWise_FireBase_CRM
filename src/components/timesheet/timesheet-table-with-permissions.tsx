@@ -280,82 +280,82 @@ export default function TimesheetTableWithPermissions({
                         </Button>
                       )}
                       
-                      {/* Only show delete button in admin view (when showAllUsers is true) */}
-                      {showAllUsers && (
-                        <>
-                          {entry.status !== 'rejected' ? (
-                            <AlertDialog 
-                              open={deleteConfirmId === entry.id} 
-                              onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+                      {/* Show delete/reject button for users and admins */}
+                      {entry.status !== 'rejected' ? (
+                        <AlertDialog
+                          open={deleteConfirmId === entry.id}
+                          onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+                        >
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeleteConfirmId(entry.id)}
+                              disabled={!canUserDelete(entry)}
+                              className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                              title="Reject entry"
                             >
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setDeleteConfirmId(entry.id)}
-                                  disabled={!canUserDelete(entry)}
-                                  className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                                  title="Reject entry"
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reject Time Entry</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to reject this time entry for {format(entry.date, 'MMM dd, yyyy')}?
+                                {showAllUsers && isAdmin()
+                                  ? 'The entry will be marked as rejected and will remain visible with a crossed-out appearance for audit purposes.'
+                                  : 'The entry will be removed from your view but stored in the database for audit purposes.'}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(entry.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Reject Entry
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      ) : (
+                        showAllUsers && (
+                          <AlertDialog
+                            open={permanentDeleteConfirmId === entry.id}
+                            onOpenChange={(open) => !open && setPermanentDeleteConfirmId(null)}
+                          >
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPermanentDeleteConfirmId(entry.id)}
+                                className="h-8 w-8 p-0 hover:bg-red-600 hover:text-white"
+                                title="Permanently delete rejected entry"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Permanently Delete Entry</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to permanently delete this rejected entry for {format(entry.date, 'MMM dd, yyyy')}?
+                                  This action cannot be undone and will completely remove the entry from the database.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handlePermanentDelete(entry.id)}
+                                  className="bg-red-600 text-white hover:bg-red-700"
                                 >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Reject Time Entry</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to reject this time entry for {format(entry.date, 'MMM dd, yyyy')}? 
-                                    The entry will be marked as rejected and will remain visible with a crossed-out appearance for audit purposes.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDelete(entry.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Reject Entry
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          ) : (
-                            <AlertDialog 
-                              open={permanentDeleteConfirmId === entry.id} 
-                              onOpenChange={(open) => !open && setPermanentDeleteConfirmId(null)}
-                            >
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setPermanentDeleteConfirmId(entry.id)}
-                                  className="h-8 w-8 p-0 hover:bg-red-600 hover:text-white"
-                                  title="Permanently delete rejected entry"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Permanently Delete Entry</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to permanently delete this rejected entry for {format(entry.date, 'MMM dd, yyyy')}? 
-                                    This action cannot be undone and will completely remove the entry from the database.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handlePermanentDelete(entry.id)}
-                                    className="bg-red-600 text-white hover:bg-red-700"
-                                  >
-                                    Permanently Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                        </>
+                                  Permanently Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )
                       )}
                     </div>
                   </TableCell>

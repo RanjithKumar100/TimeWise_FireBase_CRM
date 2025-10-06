@@ -22,7 +22,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export default function CalendarView({ entries, employees }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [leaveDates, setLeaveDates] = useState<Date[]>([]);
-  
+
   const employeeMap = useMemo(() => new Map(employees.map(e => [e.id, e.name])), [employees]);
 
   // Fetch leave dates for the current month

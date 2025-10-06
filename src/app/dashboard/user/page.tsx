@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 import TimesheetForm from '@/components/timesheet/timesheet-form';
 import TimesheetTableWithPermissions from '@/components/timesheet/timesheet-table-with-permissions';
@@ -20,6 +21,7 @@ import IndividualSummary from '@/components/reports/individual-summary';
 import StatsCard from '@/components/dashboard/stats-card';
 import { ConditionalDataLoader } from '@/components/ui/database-status';
 import { formatDateForAPI } from '@/lib/date-utils';
+import { formatTimeSpent } from '@/lib/time-utils';
 
 interface WorkLogEntry {
   id: string;
@@ -49,6 +51,7 @@ export default function UserDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<WorkLogEntry | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedDate, setSelectedDate] = useState<string>('all');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const currentUser: Employee | null = useMemo(() => {
@@ -62,6 +65,26 @@ export default function UserDashboardPage() {
       department: 'General', // Default department
     } : null;
   }, [user]);
+
+  // Sort entries: Today's entries first, then others in reverse chronological order
+  const sortEntriesByDate = (entries: WorkLogEntry[]) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todayEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() === today.getTime();
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const otherEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() !== today.getTime();
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return [...todayEntries, ...otherEntries];
+  };
 
   const fetchWorkLogs = async () => {
     try {
@@ -83,8 +106,12 @@ export default function UserDashboardPage() {
         createdAt: new Date(log.createdAt),
         updatedAt: new Date(log.updatedAt),
       }));
-      setAllWorkLogs(logs);
-      setWorkLogs(logs);
+
+      // Sort: Today's entries first, then others
+      const sortedLogs = sortEntriesByDate(logs);
+
+      setAllWorkLogs(sortedLogs);
+      setWorkLogs(sortedLogs);
     } catch (error) {
       toast({
         title: "Error",
@@ -113,19 +140,39 @@ export default function UserDashboardPage() {
 
   const monthOptions = generateMonthOptions();
 
-  // Filter work logs by selected month
+  // Get unique dates from entries for the date dropdown
+  const availableDates = useMemo(() => {
+    const dates = new Set<string>();
+    allWorkLogs.forEach(entry => {
+      const dateKey = format(entry.date, 'yyyy-MM-dd');
+      dates.add(dateKey);
+    });
+    return Array.from(dates).sort((a, b) => b.localeCompare(a)); // Sort descending (newest first)
+  }, [allWorkLogs]);
+
+  // Filter work logs by selected month and date
   useEffect(() => {
-    if (selectedMonth === 'all') {
-      setWorkLogs(allWorkLogs);
-    } else {
+    let filtered = allWorkLogs;
+
+    if (selectedMonth !== 'all') {
       const [year, month] = selectedMonth.split('-').map(Number);
-      const filtered = allWorkLogs.filter(log => {
+      filtered = filtered.filter(log => {
         const logDate = new Date(log.date);
         return logDate.getFullYear() === year && logDate.getMonth() + 1 === month;
       });
-      setWorkLogs(filtered);
     }
-  }, [selectedMonth, allWorkLogs]);
+
+    if (selectedDate !== 'all') {
+      filtered = filtered.filter(log => {
+        const dateKey = format(log.date, 'yyyy-MM-dd');
+        return dateKey === selectedDate;
+      });
+    }
+
+    // Sort: Today's entries first, then others
+    const sortedFiltered = sortEntriesByDate(filtered);
+    setWorkLogs(sortedFiltered);
+  }, [selectedMonth, selectedDate, allWorkLogs]);
 
 
   useEffect(() => {
@@ -286,21 +333,23 @@ export default function UserDashboardPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete work log');
+        const result = await response.json();
+        throw new Error(result.message || 'Failed to reject work log');
       }
 
+      // Remove the entry from the view (it's now rejected and won't show up in API response)
       setWorkLogs(prevLogs => prevLogs.filter(log => log.id !== entryId));
       setAllWorkLogs(prevLogs => prevLogs.filter(log => log.id !== entryId));
-      
+
       toast({
         title: "Success",
-        description: "Work log deleted successfully",
+        description: "Time entry rejected successfully. It has been removed from your view.",
       });
       setRefreshTrigger(prev => prev + 1);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete work log",
+        description: error.message || "Failed to reject work log",
         variant: "destructive",
       });
     }
@@ -311,12 +360,48 @@ export default function UserDashboardPage() {
   };
 
 
+  const myHoursToday = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Calculate total time in minutes for today
+    const totalMinutes = workLogs
+      .filter(entry => {
+        const entryDate = new Date(entry.date);
+        entryDate.setHours(0, 0, 0, 0);
+        return entryDate.getTime() === today.getTime();
+      })
+      .reduce((sum, entry) => {
+        const hours = (entry as any).timeHours ?? Math.floor(entry.hours);
+        const minutes = (entry as any).timeMinutes ?? Math.round((entry.hours - Math.floor(entry.hours)) * 60);
+        return sum + (hours * 60) + minutes;
+      }, 0);
+
+    return {
+      hours: Math.floor(totalMinutes / 60),
+      minutes: totalMinutes % 60,
+      display: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+    };
+  }, [workLogs]);
+
   const myHoursThisMonth = useMemo(() => {
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    return workLogs
+
+    // Calculate total time in minutes, then convert to hours/minutes
+    const totalMinutes = workLogs
       .filter(entry => entry.date > oneMonthAgo)
-      .reduce((sum, entry) => sum + entry.hours, 0);
+      .reduce((sum, entry) => {
+        const hours = (entry as any).timeHours ?? Math.floor(entry.hours);
+        const minutes = (entry as any).timeMinutes ?? Math.round((entry.hours - Math.floor(entry.hours)) * 60);
+        return sum + (hours * 60) + minutes;
+      }, 0);
+
+    return {
+      hours: Math.floor(totalMinutes / 60),
+      minutes: totalMinutes % 60,
+      display: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+    };
   }, [workLogs]);
   
   const myTasksThisMonth = useMemo(() => {
@@ -385,8 +470,9 @@ export default function UserDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatsCard title="My Hours (Month)" value={myHoursThisMonth.toFixed(1)} icon={Clock} />
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatsCard title="My Hours (Day)" value={myHoursToday.display} icon={Clock} />
+        <StatsCard title="My Hours (Month)" value={myHoursThisMonth.display} icon={Clock} />
         <StatsCard title="My Tasks (Month)" value={myTasksThisMonth} icon={CheckSquare} />
         <StatsCard title="Editable Entries" value={`${editableEntries}/${workLogs.length}`} icon={Hourglass} />
       </div>
@@ -410,12 +496,29 @@ export default function UserDashboardPage() {
               />
             </div>
             <div className="lg:col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <Tabs defaultValue="list" className="flex-1">
+                     <TabsList>
+                      <TabsTrigger value="list">List View</TabsTrigger>
+                      <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+                     </TabsList>
+                  </Tabs>
+                  <Select value={selectedDate} onValueChange={setSelectedDate}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filter by date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Dates</SelectItem>
+                      {availableDates.map(dateKey => (
+                        <SelectItem key={dateKey} value={dateKey}>
+                          {format(new Date(dateKey), 'MMM dd, yyyy')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Tabs defaultValue="list">
-                   <TabsList>
-                    <TabsTrigger value="list">List View</TabsTrigger>
-                    <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-                   </TabsList>
-                   <TabsContent value="list" className="mt-4">
+                   <TabsContent value="list" className="mt-0">
                      <TimesheetTableWithPermissions 
                        entries={workLogs} 
                        employees={[currentUser]}
@@ -424,7 +527,7 @@ export default function UserDashboardPage() {
                        showAllUsers={false}
                      />
                    </TabsContent>
-                   <TabsContent value="calendar" className="mt-4">
+                   <TabsContent value="calendar" className="mt-0">
                       <CalendarView entries={workLogs} employees={[currentUser]} />
                    </TabsContent>
                 </Tabs>

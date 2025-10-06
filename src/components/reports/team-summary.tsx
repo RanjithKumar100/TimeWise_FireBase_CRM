@@ -10,14 +10,16 @@ import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { downloadDataAsExcel, calculateEmployeeExtraTime, formatExtraTime } from '@/lib/utils';
 import { verticleColors } from '@/lib/colors';
+import { formatTimeSpent } from '@/lib/time-utils';
 
 interface TeamSummaryProps {
   entries: TimesheetEntry[];
   employees: Employee[];
   preSelectedUserId?: string | null;
+  onUserSelect?: (userId: string | null) => void;
 }
 
-export default function TeamSummary({ entries, employees, preSelectedUserId }: TeamSummaryProps) {
+export default function TeamSummary({ entries, employees, preSelectedUserId, onUserSelect }: TeamSummaryProps) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(preSelectedUserId || 'all');
 
   // Update selection when preSelectedUserId changes
@@ -25,11 +27,22 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
     setSelectedEmployeeId(preSelectedUserId || 'all');
   }, [preSelectedUserId]);
 
+  // Notify parent when selection changes
+  const handleSelectionChange = (value: string) => {
+    setSelectedEmployeeId(value);
+    if (onUserSelect) {
+      onUserSelect(value === 'all' ? null : value);
+    }
+  };
+
   const selectedEntries = useMemo(() => {
     if (selectedEmployeeId === 'all') {
+      console.log('📊 TeamSummary: Showing all entries', entries.length);
       return entries;
     }
-    return entries.filter(entry => entry.employeeId === selectedEmployeeId);
+    const filtered = entries.filter(entry => entry.employeeId === selectedEmployeeId);
+    console.log('📊 TeamSummary: Filtered entries for', selectedEmployeeId, ':', filtered.length, 'out of', entries.length);
+    return filtered;
   }, [entries, selectedEmployeeId]);
 
   const selectedEmployee = useMemo(() => {
@@ -50,42 +63,80 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
   };
 
   const aggregatedData = useMemo<AggregatedVerticleData[]>(() => {
-    const dataMap = new Map<Verticle, number>();
-    verticles.forEach(v => dataMap.set(v, 0));
+    const dataMap = new Map<Verticle, { hours: number; minutes: number }>();
+    verticles.forEach(v => dataMap.set(v, { hours: 0, minutes: 0 }));
 
     selectedEntries.forEach(entry => {
-      dataMap.set(entry.verticle, (dataMap.get(entry.verticle) || 0) + entry.hours);
+      const current = dataMap.get(entry.verticle) || { hours: 0, minutes: 0 };
+      const hours = (entry as any).timeHours ?? Math.floor(entry.hours);
+      const minutes = (entry as any).timeMinutes ?? Math.round((entry.hours - Math.floor(entry.hours)) * 60);
+
+      const totalMinutes = (current.hours * 60 + current.minutes) + (hours * 60 + minutes);
+      dataMap.set(entry.verticle, {
+        hours: Math.floor(totalMinutes / 60),
+        minutes: totalMinutes % 60
+      });
     });
 
-    return Array.from(dataMap.entries()).map(([verticle, totalHours]) => ({
+    return Array.from(dataMap.entries()).map(([verticle, time]) => ({
       verticle,
-      totalHours,
+      totalHours: time.hours + (time.minutes / 60), // Keep decimal for chart compatibility
     }));
   }, [selectedEntries, verticles]);
 
   const teamOverallData = useMemo(() => {
-    const employeeData = new Map<string, { name: string, hoursByVerticle: Map<Verticle, number>, total: number, extraTime: number, employeeId: string }>();
+    const employeeData = new Map<string, {
+      name: string,
+      hoursByVerticle: Map<Verticle, { hours: number; minutes: number; display: string }>,
+      totalHours: number,
+      totalMinutes: number,
+      totalDisplay: string,
+      extraTime: number,
+      employeeId: string
+    }>();
 
     // Filter employees based on selection
     const relevantEmployees = selectedEmployeeId === 'all' ? employees : employees.filter(emp => emp.id === selectedEmployeeId);
 
     relevantEmployees.forEach(emp => {
-        const verticleMap = new Map<Verticle, number>();
-        verticles.forEach(v => verticleMap.set(v, 0));
-        employeeData.set(emp.id, { name: emp.name, hoursByVerticle: verticleMap, total: 0, extraTime: 0, employeeId: emp.id });
+        const verticleMap = new Map<Verticle, { hours: number; minutes: number; display: string }>();
+        verticles.forEach(v => verticleMap.set(v, { hours: 0, minutes: 0, display: '0h' }));
+        employeeData.set(emp.id, {
+          name: emp.name,
+          hoursByVerticle: verticleMap,
+          totalHours: 0,
+          totalMinutes: 0,
+          totalDisplay: '0h',
+          extraTime: 0,
+          employeeId: emp.id
+        });
     });
 
     // Use selectedEntries instead of all entries to match the filter
     selectedEntries.forEach(entry => {
         const empData = employeeData.get(entry.employeeId);
         if (empData) {
-            empData.hoursByVerticle.set(entry.verticle, (empData.hoursByVerticle.get(entry.verticle) || 0) + entry.hours);
-            empData.total += entry.hours;
+            const hours = (entry as any).timeHours ?? Math.floor(entry.hours);
+            const minutes = (entry as any).timeMinutes ?? Math.round((entry.hours - Math.floor(entry.hours)) * 60);
+
+            // Update verticle-specific time
+            const current = empData.hoursByVerticle.get(entry.verticle) || { hours: 0, minutes: 0, display: '0h' };
+            const totalMinutes = (current.hours * 60 + current.minutes) + (hours * 60 + minutes);
+            empData.hoursByVerticle.set(entry.verticle, {
+              hours: Math.floor(totalMinutes / 60),
+              minutes: totalMinutes % 60,
+              display: formatTimeSpent(Math.floor(totalMinutes / 60), totalMinutes % 60)
+            });
+
+            // Update total time
+            empData.totalMinutes += (hours * 60) + minutes;
         }
     });
 
-    // Calculate extra time for each employee
+    // Calculate totals and extra time for each employee
     employeeData.forEach((empData, employeeId) => {
+        empData.totalHours = Math.floor(empData.totalMinutes / 60);
+        empData.totalDisplay = formatTimeSpent(Math.floor(empData.totalMinutes / 60), empData.totalMinutes % 60);
         empData.extraTime = calculateEmployeeExtraTime(selectedEntries, employeeId);
     });
 
@@ -109,7 +160,7 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-wrap gap-4 items-center">
-            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+            <Select value={selectedEmployeeId} onValueChange={handleSelectionChange}>
               <SelectTrigger className="w-[280px]">
                 <SelectValue placeholder="Select an employee" />
               </SelectTrigger>
@@ -125,7 +176,7 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
                 Download Excel
             </Button>
           </div>
-          <SummaryChart data={aggregatedData} />
+          <SummaryChart key={selectedEmployeeId} data={aggregatedData} />
         </CardContent>
       </Card>
       <Card>
@@ -165,8 +216,8 @@ export default function TeamSummary({ entries, employees, preSelectedUserId }: T
                         {teamOverallData.map(empData => (
                             <TableRow key={empData.name}>
                                 <TableCell className="font-medium">{empData.name}</TableCell>
-                                {verticles.map(v => <TableCell key={v} className="text-right">{empData.hoursByVerticle.get(v)?.toFixed(1)}</TableCell>)}
-                                <TableCell className="text-right font-bold">{empData.total.toFixed(1)}</TableCell>
+                                {verticles.map(v => <TableCell key={v} className="text-right">{empData.hoursByVerticle.get(v)?.display || '0h'}</TableCell>)}
+                                <TableCell className="text-right font-bold">{empData.totalDisplay}</TableCell>
                                 <TableCell className="text-right font-bold text-orange-600">
                                   {empData.extraTime > 0 ? formatExtraTime(empData.extraTime) : '0h'}
                                 </TableCell>

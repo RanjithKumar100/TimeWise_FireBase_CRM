@@ -240,7 +240,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/worklogs/[id] - Reject work log (admin only)
+// DELETE /api/worklogs/[id] - Reject work log (admin and users can reject their own entries)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -253,14 +253,24 @@ export async function DELETE(
       return createErrorResponse('Authentication required', 401);
     }
 
-    // Only admins can reject entries (soft delete)
-    if (authUser.role !== 'Admin') {
-      return createErrorResponse('Only administrators can reject entries', 403);
-    }
-
     const workLog = await WorkLog.findOne({ logId: params.id });
     if (!workLog) {
       return createErrorResponse('Work log not found', 404);
+    }
+
+    // Permission check: Users can reject their own entries, Admins can reject any entry
+    if (authUser.role !== 'Admin' && workLog.userId !== authUser.userId) {
+      return createErrorResponse('You can only reject your own entries', 403);
+    }
+
+    // Check if user can still edit this entry (based on edit window)
+    if (authUser.role !== 'Admin') {
+      const canEdit = workLog.canEdit(authUser.userId, authUser.role);
+      if (!canEdit) {
+        const systemConfig = readSystemConfig();
+        const editTimeLimit = systemConfig.editTimeLimit || 3;
+        return createErrorResponse(`Reject window expired. You can only reject entries within the last ${editTimeLimit} days.`, 403);
+      }
     }
 
     // Mark entry as rejected instead of deleting
@@ -269,39 +279,41 @@ export async function DELETE(
       { status: 'rejected' },
       { new: true }
     );
-    
+
     if (!rejectedLog) {
       return createErrorResponse('Work log not found or already rejected', 404);
     }
-    
-    // Create notification for the user
-    try {
-      const notification = await NotificationLog.create({
-        userId: rejectedLog.userId,
-        userEmail: rejectedLog.userEmail,
-        userName: rejectedLog.userName,
-        notificationType: 'entry_rejected',
-        rejectedEntry: {
-          entryId: rejectedLog.logId,
-          date: rejectedLog.date,
-          task: rejectedLog.task,
-          hours: rejectedLog.hours,
-          minutes: rejectedLog.minutes,
-          rejectedBy: authUser.userId,
-          rejectedByName: authUser.name || 'Admin'
-        },
-        sentAt: new Date(),
-        emailSent: false,
-        isRead: false  // Explicitly set to ensure it appears in notifications
-      });
-      
-      console.log('✅ Rejection notification created:', notification.notificationId, 'for user:', rejectedLog.userId);
-    } catch (notificationError) {
-      console.error('❌ Failed to create rejection notification:', notificationError);
-      // Don't fail the rejection if notification creation fails
+
+    // Create notification only if admin rejected someone else's entry
+    if (authUser.role === 'Admin' && authUser.userId !== rejectedLog.userId) {
+      try {
+        const notification = await NotificationLog.create({
+          userId: rejectedLog.userId,
+          userEmail: rejectedLog.userEmail,
+          userName: rejectedLog.userName,
+          notificationType: 'entry_rejected',
+          rejectedEntry: {
+            entryId: rejectedLog.logId,
+            date: rejectedLog.date,
+            task: rejectedLog.task,
+            hours: rejectedLog.hours,
+            minutes: rejectedLog.minutes,
+            rejectedBy: authUser.userId,
+            rejectedByName: authUser.name || 'Admin'
+          },
+          sentAt: new Date(),
+          emailSent: false,
+          isRead: false  // Explicitly set to ensure it appears in notifications
+        });
+
+        console.log('✅ Rejection notification created:', notification.notificationId, 'for user:', rejectedLog.userId);
+      } catch (notificationError) {
+        console.error('❌ Failed to create rejection notification:', notificationError);
+        // Don't fail the rejection if notification creation fails
+      }
     }
 
-    console.log('Work log rejected by admin:', {
+    console.log('Work log rejected:', {
       id: rejectedLog.logId,
       userId: rejectedLog.userId,
       date: rejectedLog.date,
@@ -309,6 +321,7 @@ export async function DELETE(
       minutes: rejectedLog.minutes,
       status: rejectedLog.status,
       rejectedBy: authUser.userId,
+      rejectedByRole: authUser.role,
       rejectedAt: new Date()
     });
 
