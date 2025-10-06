@@ -23,10 +23,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['mongoose'],
 
   // Disable development indicators
-  devIndicators: {
-    buildActivity: false,
-    buildActivityPosition: 'bottom-right',
-  },
+  devIndicators: false,
   
   // Allow cross-origin requests from network devices
   async headers() {
