@@ -211,7 +211,7 @@ class EmailService {
             </ul>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'}/dashboard/user" class="button">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://timewise.cmis.ac.in:9002/login'}" class="button">
                 📝 Complete Your Timesheet
               </a>
             </div>
@@ -246,7 +246,7 @@ Please enter your missing timesheet data as soon as possible!
 
 Please log into the TimeWise system and complete your timesheet entries as soon as possible.
 
-Login at: ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'}/dashboard/user
+Login at: ${process.env.NEXT_PUBLIC_APP_URL || 'http://timewise.cmis.ac.in:9002/login'}
 
 Important: You can only edit entries within 3 days of the work date.
 
@@ -257,7 +257,7 @@ This is an automated reminder from the TimeWise system.
   }
 
   generateWelcomeEmail(userName: string, userEmail: string, password: string, role: 'Admin' | 'User' | 'Inspection'): { subject: string; html: string; text: string } {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://192.168.1.43:9002';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://timewise.cmis.ac.in:9002/login';
     const isAdmin = role === 'Admin';
     const isInspection = role === 'Inspection';
     
