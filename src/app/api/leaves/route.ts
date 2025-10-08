@@ -14,10 +14,8 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Authentication required', 401);
     }
 
-    // Only admins can access leave management
-    if (authUser.role !== 'Admin') {
-      return createErrorResponse('Admin access required', 403);
-    }
+    // All authenticated users can view leave dates (needed for calendar views)
+    // Only creating/deleting leaves requires admin access
 
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');

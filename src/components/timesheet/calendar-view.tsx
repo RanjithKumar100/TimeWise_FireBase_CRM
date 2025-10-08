@@ -22,6 +22,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export default function CalendarView({ entries, employees }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [leaveDates, setLeaveDates] = useState<Date[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const employeeMap = useMemo(() => new Map(employees.map(e => [e.id, e.name])), [employees]);
 
@@ -30,10 +31,14 @@ export default function CalendarView({ entries, employees }: CalendarViewProps) 
     try {
       const startDate = formatDateForAPI(startOfMonth(date));
       const endDate = formatDateForAPI(endOfMonth(date));
-      
-      const response = await fetch(`/api/leaves?startDate=${startDate}&endDate=${endDate}`, {
+
+      // Add cache busting to ensure fresh data
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/leaves?startDate=${startDate}&endDate=${endDate}&_t=${timestamp}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
       });
 
@@ -41,6 +46,7 @@ export default function CalendarView({ entries, employees }: CalendarViewProps) 
         const result = await response.json();
         const dates = result.data.leaves.map((leave: any) => new Date(leave.date));
         setLeaveDates(dates);
+        console.log('📅 Calendar: Fetched', dates.length, 'leave dates for', format(date, 'MMMM yyyy'));
       }
     } catch (error) {
       console.error('Failed to fetch leave dates:', error);
@@ -50,7 +56,15 @@ export default function CalendarView({ entries, employees }: CalendarViewProps) 
 
   useEffect(() => {
     fetchLeaveDates(currentDate);
-  }, [currentDate]);
+  }, [currentDate, refreshKey]);
+
+  // Auto-refresh every 30 seconds to catch newly added leave days
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const firstDayOfMonth = startOfMonth(currentDate);
   const lastDayOfMonth = endOfMonth(currentDate);
