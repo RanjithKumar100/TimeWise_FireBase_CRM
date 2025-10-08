@@ -53,6 +53,7 @@ export default function UserDashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('all');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   const currentUser: Employee | null = useMemo(() => {
     return user ? {
@@ -497,40 +498,42 @@ export default function UserDashboardPage() {
             </div>
             <div className="lg:col-span-2">
                 <div className="flex items-center justify-between mb-4">
-                  <Tabs defaultValue="list" className="flex-1">
+                  <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'calendar')} className="flex-1">
                      <TabsList>
                       <TabsTrigger value="list">List View</TabsTrigger>
                       <TabsTrigger value="calendar">Calendar View</TabsTrigger>
                      </TabsList>
                   </Tabs>
-                  <Select value={selectedDate} onValueChange={setSelectedDate}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filter by date" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Dates</SelectItem>
-                      {availableDates.map(dateKey => (
-                        <SelectItem key={dateKey} value={dateKey}>
-                          {format(new Date(dateKey), 'MMM dd, yyyy')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {viewMode === 'list' && (
+                    <Select value={selectedDate} onValueChange={setSelectedDate}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filter by date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Dates</SelectItem>
+                        {availableDates.map(dateKey => (
+                          <SelectItem key={dateKey} value={dateKey}>
+                            {format(new Date(dateKey), 'MMM dd, yyyy')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
-                <Tabs defaultValue="list">
-                   <TabsContent value="list" className="mt-0">
-                     <TimesheetTableWithPermissions 
-                       entries={workLogs} 
-                       employees={[currentUser]}
-                       onEdit={handleEditEntry}
-                       onDelete={handleDeleteEntry}
-                       showAllUsers={false}
-                     />
-                   </TabsContent>
-                   <TabsContent value="calendar" className="mt-0">
-                      <CalendarView entries={workLogs} employees={[currentUser]} />
-                   </TabsContent>
-                </Tabs>
+
+                {viewMode === 'list' && (
+                  <TimesheetTableWithPermissions
+                    entries={workLogs}
+                    employees={[currentUser]}
+                    onEdit={handleEditEntry}
+                    onDelete={handleDeleteEntry}
+                    showAllUsers={false}
+                  />
+                )}
+
+                {viewMode === 'calendar' && (
+                  <CalendarView entries={workLogs} employees={[currentUser]} />
+                )}
             </div>
           </div>
         </TabsContent>

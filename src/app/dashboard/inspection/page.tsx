@@ -35,6 +35,7 @@ export default function InspectionDashboard() {
   const [loading, setLoading] = useState(false);
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [complianceFilter, setComplianceFilter] = useState('all'); // all, high, medium, low
+  const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set());
 
   // Redirect if user doesn't have inspection access
   useEffect(() => {
@@ -43,9 +44,10 @@ export default function InspectionDashboard() {
     }
   }, [user, isInspection, canViewAllData]);
 
-  // Fetch all users
+  // Fetch all users and leave dates
   useEffect(() => {
     fetchUsers();
+    fetchLeaveDates();
   }, []);
 
   // Fetch compliance stats when time range changes
@@ -82,6 +84,28 @@ export default function InspectionDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
+    }
+  };
+
+  const fetchLeaveDates = async () => {
+    try {
+      const response = await fetch('/api/leaves', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const leaves = result.data.leaves || [];
+        const leaveDateStrings = new Set(
+          leaves.map((leave: any) => formatDateForAPI(new Date(leave.date)))
+        );
+        setLeaveDates(leaveDateStrings);
+        console.log('📅 Fetched leave dates:', Array.from(leaveDateStrings));
+      }
+    } catch (error) {
+      console.error('Failed to fetch leave dates:', error);
     }
   };
 
@@ -189,6 +213,7 @@ export default function InspectionDashboard() {
       const currentMonth = current.getMonth();
       const currentYear = current.getFullYear();
       const currentDate = current.getDate();
+      const dateString = formatDateForAPI(current);
 
       // Exclude Sundays (dayOfWeek === 0)
       if (dayOfWeek === 0) {
@@ -205,7 +230,13 @@ export default function InspectionDashboard() {
         }
       }
 
-      // Count all other days (Monday-Friday, and Saturdays except 2nd Saturday)
+      // Exclude company leave days
+      if (leaveDates.has(dateString)) {
+        current.setDate(current.getDate() + 1);
+        continue;
+      }
+
+      // Count all other days (Monday-Friday, and Saturdays except 2nd Saturday, and not leave days)
       count++;
       current.setDate(current.getDate() + 1);
     }
@@ -237,6 +268,7 @@ export default function InspectionDashboard() {
       const currentMonth = current.getMonth();
       const currentYear = current.getFullYear();
       const currentDate = current.getDate();
+      const dateString = formatDateForAPI(current);
 
       // Exclude Sundays (dayOfWeek === 0)
       if (dayOfWeek === 0) {
@@ -253,8 +285,13 @@ export default function InspectionDashboard() {
         }
       }
 
+      // Exclude company leave days (festivals/holidays)
+      if (leaveDates.has(dateString)) {
+        current.setDate(current.getDate() + 1);
+        continue;
+      }
+
       // Check if this work day is missing
-      const dateString = formatDateForAPI(current);
       if (!completedSet.has(dateString)) {
         missing.push(dateString);
       }

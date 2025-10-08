@@ -63,6 +63,7 @@ export default function AdminDashboardPage() {
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [selectedUser, setSelectedUser] = useState<Employee | null>(null);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   const fetchUsers = async () => {
     try {
@@ -750,23 +751,29 @@ export default function AdminDashboardPage() {
         </TabsContent>
 
         <TabsContent value="all-entries" className="mt-4">
-            <Tabs defaultValue="list">
+            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'calendar')}>
                <TabsList>
                 <TabsTrigger value="list">List View</TabsTrigger>
                 <TabsTrigger value="calendar">Calendar View</TabsTrigger>
                </TabsList>
-               <TabsContent value="list" className="mt-4">
-                 <TimesheetTableWithPermissions 
-                   entries={workLogs} 
-                   employees={users}
-                   onDelete={handleDeleteEntry}
-                   showAllUsers={true}
-                 />
-               </TabsContent>
-               <TabsContent value="calendar" className="mt-4">
-                  <CalendarView entries={workLogs} employees={users} />
-               </TabsContent>
             </Tabs>
+
+            {viewMode === 'list' && (
+              <div className="mt-4">
+                <TimesheetTableWithPermissions
+                  entries={workLogs}
+                  employees={users}
+                  onDelete={handleDeleteEntry}
+                  showAllUsers={true}
+                />
+              </div>
+            )}
+
+            {viewMode === 'calendar' && (
+              <div className="mt-4">
+                <CalendarView entries={workLogs} employees={users} />
+              </div>
+            )}
         </TabsContent>
 
         <TabsContent value="manage-users" className="mt-4">

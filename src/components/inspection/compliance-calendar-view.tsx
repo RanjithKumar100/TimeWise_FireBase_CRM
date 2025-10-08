@@ -23,12 +23,14 @@ interface DayStatus {
   isToday: boolean;
   entries: any[];
   isSecondSaturday?: boolean;
+  isLeaveDay?: boolean;
 }
 
 export function ComplianceCalendarView({ user, className }: ComplianceCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [workLogs, setWorkLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set());
   const [monthStats, setMonthStats] = useState({
     totalWorkDays: 0,
     completedDays: 0,
@@ -69,6 +71,10 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
   };
 
   useEffect(() => {
+    fetchLeaveDates();
+  }, []);
+
+  useEffect(() => {
     fetchWorkLogs();
   }, [currentDate, user, refreshKey]);
 
@@ -79,6 +85,28 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchLeaveDates = async () => {
+    try {
+      const response = await fetch('/api/leaves', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const leaves = result.data.leaves || [];
+        const leaveDateStrings = new Set(
+          leaves.map((leave: any) => formatDateForAPI(new Date(leave.date)))
+        );
+        setLeaveDates(leaveDateStrings);
+        console.log('📅 Fetched leave dates for calendar:', Array.from(leaveDateStrings));
+      }
+    } catch (error) {
+      console.error('Failed to fetch leave dates:', error);
+    }
+  };
 
   const fetchWorkLogs = async () => {
     setLoading(true);
@@ -137,6 +165,7 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
       const currentMonth = day.getMonth();
       const currentYear = day.getFullYear();
       const currentDate = day.getDate();
+      const dateString = formatDateForAPI(day);
 
       // Exclude future dates
       if (day > new Date()) return false;
@@ -150,7 +179,10 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
         if (currentDate === secondSaturdayDate) return false;
       }
 
-      return true; // Include all other days (Mon-Fri, and Saturdays except 2nd Saturday)
+      // Exclude company leave days (festivals/holidays)
+      if (leaveDates.has(dateString)) return false;
+
+      return true; // Include all other days (Mon-Fri, and Saturdays except 2nd Saturday, and not leave days)
     });
 
     const logDates = new Set(logs.map(log => formatDateForAPI(new Date(log.date))));
@@ -178,6 +210,7 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
     const currentMonth = date.getMonth();
     const currentYear = date.getFullYear();
     const currentDate = date.getDate();
+    const dateString = formatDateForAPI(date);
 
     // Find the second Saturday of the month
     const getSecondSaturday = (month: number, year: number): number => {
@@ -194,7 +227,10 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
       return firstSaturday + 7;
     };
 
-    // Determine if this is a work day (exclude Sundays and 2nd Saturday)
+    // Check if this is a company leave day (festival/holiday)
+    const isLeaveDay = leaveDates.has(dateString);
+
+    // Determine if this is a work day (exclude Sundays, 2nd Saturday, and leave days)
     let isWorkDay = true;
     let isSecondSaturday = false;
 
@@ -206,10 +242,11 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
         isWorkDay = false; // Second Saturday
         isSecondSaturday = true;
       }
+    } else if (isLeaveDay) {
+      isWorkDay = false; // Company leave day
     }
 
     const isToday = isSameDay(date, new Date());
-    const dateString = formatDateForAPI(date);
     const dayEntries = workLogs.filter(log =>
       formatDateForAPI(new Date(log.date)) === dateString
     );
@@ -228,11 +265,13 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
       isWorkDay,
       isToday,
       entries: dayEntries,
-      isSecondSaturday
+      isSecondSaturday,
+      isLeaveDay
     };
   };
 
   const getDayColor = (dayStatus: DayStatus) => {
+    if (dayStatus.isLeaveDay) return 'bg-purple-50 text-purple-600 border-purple-300'; // Company leave day
     if (dayStatus.isSecondSaturday) return 'bg-blue-50 text-blue-600'; // 2nd Saturday - Non-work day
     if (!dayStatus.isWorkDay) return 'bg-gray-50 text-gray-400'; // Weekend (Sundays)
     if (dayStatus.date > new Date()) return 'bg-gray-50 text-gray-400'; // Future date
@@ -347,8 +386,12 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
             <span>Missing Entry</span>
           </div>
           <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-purple-50 border border-purple-300 rounded"></div>
+            <span>Company Leave (Holiday)</span>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-blue-50 border border-blue-200 rounded"></div>
-            <span>2nd Saturday (Non-work day)</span>
+            <span>2nd Saturday</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded"></div>
@@ -386,13 +429,15 @@ export function ComplianceCalendarView({ user, className }: ComplianceCalendarVi
                     dayStatus.isToday && "ring-2 ring-blue-500"
                   )}
                   title={`${format(day, 'MMM d, yyyy')} - ${
-                    dayStatus.isSecondSaturday
-                      ? 'Non-work day (2nd Saturday)'
-                      : dayStatus.hasEntry
-                        ? `${formatDecimalToTime(dayStatus.hours)} logged`
-                        : dayStatus.isWorkDay && day <= new Date()
-                          ? 'No entry'
-                          : ''
+                    dayStatus.isLeaveDay
+                      ? 'Company Leave Day (Holiday/Festival)'
+                      : dayStatus.isSecondSaturday
+                        ? 'Non-work day (2nd Saturday)'
+                        : dayStatus.hasEntry
+                          ? `${formatDecimalToTime(dayStatus.hours)} logged`
+                          : dayStatus.isWorkDay && day <= new Date()
+                            ? 'No entry'
+                            : ''
                   }`}
                 >
                   <div className="flex flex-col items-center gap-1">

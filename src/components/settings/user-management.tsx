@@ -47,7 +47,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'User';
+  role: 'Admin' | 'User' | 'Inspection';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -80,7 +80,7 @@ export default function UserManagement() {
     name: '',
     email: '',
     password: '',
-    role: 'User' as 'Admin' | 'User',
+    role: 'User' as 'Admin' | 'User' | 'Inspection',
     isActive: true
   });
 
@@ -380,13 +380,14 @@ export default function UserManagement() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="create-role">Role</Label>
-                  <Select value={formData.role} onValueChange={(value: 'Admin' | 'User') => setFormData(prev => ({ ...prev, role: value }))}>
+                  <Select value={formData.role} onValueChange={(value: 'Admin' | 'User' | 'Inspection') => setFormData(prev => ({ ...prev, role: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="User">User</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
+                      <SelectItem value="Inspection">Inspection</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -446,7 +447,7 @@ export default function UserManagement() {
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'}>
+                      <Badge variant={user.role === 'Admin' ? 'default' : user.role === 'Inspection' ? 'outline' : 'secondary'}>
                         {user.role}
                       </Badge>
                     </TableCell>
@@ -552,13 +553,14 @@ export default function UserManagement() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-role">Role</Label>
-              <Select value={formData.role} onValueChange={(value: 'Admin' | 'User') => setFormData(prev => ({ ...prev, role: value }))}>
+              <Select value={formData.role} onValueChange={(value: 'Admin' | 'User' | 'Inspection') => setFormData(prev => ({ ...prev, role: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="User">User</SelectItem>
                   <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Inspection">Inspection</SelectItem>
                 </SelectContent>
               </Select>
             </div>

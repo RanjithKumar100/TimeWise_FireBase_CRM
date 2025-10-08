@@ -31,7 +31,18 @@ const readSystemConfig = () => {
 // GET /api/worklogs - Get work logs (filtered by user role)
 export async function GET(request: NextRequest) {
   try {
-    await dbConnect();
+    // Connect with timeout protection
+    const dbConnectPromise = dbConnect();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database connection timeout')), 10000)
+    );
+
+    try {
+      await Promise.race([dbConnectPromise, timeoutPromise]);
+    } catch (dbError: any) {
+      console.error('❌ Database connection failed in GET /api/worklogs:', dbError.message);
+      return createErrorResponse('Database connection failed. Please try again.', 503);
+    }
 
     const authUser = await getAuthenticatedUser(request);
     if (!authUser) {
@@ -79,12 +90,25 @@ export async function GET(request: NextRequest) {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    // Get work logs with user information
-    const workLogs = await WorkLog.find(query)
+    // Get work logs with user information (with timeout)
+    const queryPromise = WorkLog.find(query)
       .sort({ date: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean();
+      .lean()
+      .maxTimeMS(30000); // MongoDB server-side timeout: 30 seconds
+
+    const queryTimeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout')), 35000) // Client timeout: 35 seconds
+    );
+
+    let workLogs;
+    try {
+      workLogs = await Promise.race([queryPromise, queryTimeoutPromise]);
+    } catch (queryError: any) {
+      console.error('❌ Query timeout in GET /api/worklogs:', queryError.message);
+      return createErrorResponse('Query took too long. Please try with filters or reduce date range.', 408);
+    }
 
     console.log('Fetched work logs sample:', workLogs.length > 0 ? {
       id: workLogs[0].logId,
@@ -131,7 +155,19 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const totalCount = await WorkLog.countDocuments(query);
+    // Count with timeout protection
+    const countPromise = WorkLog.countDocuments(query).maxTimeMS(10000);
+    const countTimeoutPromise = new Promise<number>((_, reject) =>
+      setTimeout(() => reject(new Error('Count timeout')), 12000)
+    );
+
+    let totalCount;
+    try {
+      totalCount = await Promise.race([countPromise, countTimeoutPromise]);
+    } catch (countError) {
+      console.warn('⚠️ Count timeout, using approximate count');
+      totalCount = workLogs.length; // Fallback to returned results count
+    }
 
     return createSuccessResponse('Work logs retrieved successfully', {
       workLogs: enrichedWorkLogs,
@@ -152,13 +188,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     console.log('🔍 POST /api/worklogs - Starting request processing');
-    
+
+    // Connect with timeout protection
+    const dbConnectPromise = dbConnect();
+    const dbTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database connection timeout')), 10000)
+    );
+
     try {
-      await dbConnect();
+      await Promise.race([dbConnectPromise, dbTimeoutPromise]);
       console.log('✅ Database connected successfully');
-    } catch (dbError) {
-      console.error('❌ Database connection failed:', dbError);
-      return createErrorResponse('Database connection failed', 500);
+    } catch (dbError: any) {
+      console.error('❌ Database connection failed:', dbError.message);
+      return createErrorResponse('Database connection failed. Please try again.', 503);
     }
 
     const authUser = await getAuthenticatedUser(request);
@@ -252,17 +294,29 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(leaveValidation.message || 'Cannot create entries on leave days', 400);
     }
 
-    // Check daily 24-hour limit
+    // Check daily 24-hour limit with timeout
     const startOfDay = new Date(recordDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(recordDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const existingLogs = await WorkLog.find({
+    const existingLogsPromise = WorkLog.find({
       userId: authUser.userId,
       date: { $gte: startOfDay, $lte: endOfDay },
       status: 'approved' // Only count approved entries for daily limit
-    });
+    }).maxTimeMS(5000);
+
+    const existingLogsTimeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout')), 6000)
+    );
+
+    let existingLogs;
+    try {
+      existingLogs = await Promise.race([existingLogsPromise, existingLogsTimeoutPromise]);
+    } catch (queryError: any) {
+      console.error('❌ Existing logs query timeout:', queryError.message);
+      return createErrorResponse('Database query timeout. Please try again.', 408);
+    }
 
     const totalHoursForDay = existingLogs.reduce((sum, log) => {
       // Calculate decimal hours from hours and minutes
@@ -273,8 +327,19 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(`Cannot exceed ${systemConfig.maxHoursPerDay} hours per day. Current total: ${totalHoursForDay} hours. Attempting to add: ${convertedHours} hours.`, 400);
     }
 
-    // Get user info for storing in WorkLog
-    const user = await User.findOne({ userId: authUser.userId }).select('name email role').lean() as any;
+    // Get user info for storing in WorkLog with timeout
+    const userPromise = User.findOne({ userId: authUser.userId }).select('name email role').lean().maxTimeMS(3000);
+    const userTimeoutPromise = new Promise<any>((_, reject) =>
+      setTimeout(() => reject(new Error('User query timeout')), 4000)
+    );
+
+    let user;
+    try {
+      user = await Promise.race([userPromise, userTimeoutPromise]);
+    } catch (userQueryError) {
+      console.error('❌ User query timeout, using auth user data');
+      user = null; // Will fallback to authUser data below
+    }
     
     // Create new work log with user information stored for historical preservation
     const workLogData = {
@@ -295,11 +360,20 @@ export async function POST(request: NextRequest) {
     
     const workLog = new WorkLog(workLogData);
 
+    // Save with timeout
+    const savePromise = workLog.save();
+    const saveTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Save timeout')), 10000)
+    );
+
     try {
-      await workLog.save();
+      await Promise.race([savePromise, saveTimeoutPromise]);
       console.log('✅ WorkLog saved successfully:', workLog.logId);
-    } catch (saveError) {
-      console.error('❌ Failed to save WorkLog:', saveError);
+    } catch (saveError: any) {
+      console.error('❌ Failed to save WorkLog:', saveError.message);
+      if (saveError.message === 'Save timeout') {
+        return createErrorResponse('Database save timeout. Please try again.', 408);
+      }
       throw saveError;
     }
 
