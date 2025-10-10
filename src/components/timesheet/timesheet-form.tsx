@@ -42,7 +42,7 @@ const defaultVerticles = ['CMIS', 'TRI', 'LOF', 'TRG'];
 // Create form schema function that accepts dynamic verticles
 const createFormSchema = (availableVerticles: string[]) => z.object({
   date: z.date({ required_error: 'A date is required.' }),
-  verticle: z.string().refine((val) => availableVerticles.includes(val), {
+  verticle: z.string().min(1, 'Please select a verticle.').refine((val) => availableVerticles.includes(val), {
     message: 'Please select a valid verticle.',
   }),
   country: z.string().min(2, 'Country must be at least 2 characters.'),
@@ -91,6 +91,7 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
   const [dailyHoursLoaded, setDailyHoursLoaded] = useState(false);
   const [taskOptions, setTaskOptions] = useState<ComboboxOption[]>(defaultTaskOptions);
   const [availableVerticles, setAvailableVerticles] = useState<string[]>(defaultVerticles);
+  const [availableCountries, setAvailableCountries] = useState<string[]>(['India', 'Dubai']); // Default countries
   const [dailyHoursTarget, setDailyHoursTarget] = useState(8);
   const [editTimeLimit, setEditTimeLimit] = useState(3);
   const [formSchema, setFormSchema] = useState(() => createFormSchema(defaultVerticles));
@@ -120,6 +121,12 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
           console.log('🔄 Updated available verticles:', result.data.availableVerticles);
         }
 
+        // Update available countries
+        if (result.data.availableCountries && result.data.availableCountries.length > 0) {
+          setAvailableCountries(result.data.availableCountries);
+          console.log('🔄 Updated available countries:', result.data.availableCountries);
+        }
+
         // Update daily hours target from system config (use maxHoursPerDay as the daily target)
         setDailyHoursTarget(result.data.maxHoursPerDay || result.data.standardWorkingHours || 8);
         setEditTimeLimit(result.data.editTimeLimit || 3);
@@ -134,9 +141,10 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
 
   const form = useForm<TimesheetFormValues>({
     resolver: zodResolver(formSchema),
+    mode: 'onSubmit', // Only validate on submit, not on mount
     defaultValues: {
       date: editingEntry?.date || new Date(),
-      verticle: editingEntry?.verticle,
+      verticle: editingEntry?.verticle || '',
       country: editingEntry?.country || '',
       task: editingEntry?.task || '',
       taskDescription: (editingEntry as any)?.taskDescription || '',
@@ -284,7 +292,7 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
         taskDescription: (editingEntry as any)?.taskDescription || '',
         hours: (editingEntry as any).timeHours !== undefined ? (editingEntry as any).timeHours : Math.floor(editingEntry.hours),
         minutes: (editingEntry as any).timeMinutes !== undefined ? (editingEntry as any).timeMinutes : Math.round((Math.round(editingEntry.hours * 100) / 100 - Math.floor(editingEntry.hours)) * 60),
-      });
+      }, { keepErrors: false }); // Clear any previous errors
     }
   }, [editingEntry, form]);
 
@@ -331,15 +339,15 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
     };
 
     onSave(convertedData);
-    
+
     // Smart reset: preserve verticle selection for new entries, full reset for edits
     if (!editingEntry) {
       const currentVerticle = form.getValues('verticle');
-      
+
       // Keep the same date if it's today, otherwise reset to today
       const today = new Date();
       const isToday = data.date.toDateString() === today.toDateString();
-      
+
       form.reset({
         date: isToday ? data.date : today,
         verticle: currentVerticle, // Preserve the selected verticle
@@ -348,7 +356,7 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
         taskDescription: '',
         hours: 0,
         minutes: 0,
-      });
+      }, { keepErrors: false }); // Clear all validation errors
     }
     
     // Let the parent component handle refreshing via refreshTrigger
@@ -356,7 +364,15 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
   };
 
   const handleCancel = () => {
-    form.reset();
+    form.reset({
+      date: new Date(),
+      verticle: '',
+      country: '',
+      task: '',
+      taskDescription: '',
+      hours: 0,
+      minutes: 0,
+    }, { keepErrors: false }); // Clear all validation errors
     onCancel?.();
   };
 
@@ -400,7 +416,13 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
                       <Calendar
                         mode="single"
                         selected={field.value}
-                        onSelect={field.onChange}
+                        onSelect={(date) => {
+                          if (date) {
+                            field.onChange(date);
+                            // Clear any date field errors when a date is selected
+                            form.clearErrors('date');
+                          }
+                        }}
                         disabled={(date) => {
                           const today = new Date();
                           const limitDaysAgo = new Date();
@@ -457,9 +479,18 @@ export default function TimesheetForm({ onSave, currentUser, myTasks, editingEnt
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Country</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., USA" {...field} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a country" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableCountries.map((country) => (
+                        <SelectItem key={country} value={country}>{country}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

@@ -1,9 +1,9 @@
 export const formatDateForAPI = (date: Date): string => {
-  // Format date in YYYY-MM-DD format using UTC to avoid timezone issues
-  // This is critical for dates like the 1st of the month
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
+  // Format date in YYYY-MM-DD format using local timezone
+  // Use local time methods to preserve the user's selected date
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
 };
