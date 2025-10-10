@@ -24,7 +24,11 @@ const nextConfig: NextConfig = {
 
   // Disable development indicators
   devIndicators: false,
-  
+
+  // IMPORTANT: Trust proxy headers from reverse proxy (IIS/Nginx/Caddy)
+  // This ensures correct client IP and protocol detection
+  // assetPrefix: process.env.NODE_ENV === 'production' ? '' : '',
+
   // Allow cross-origin requests from network devices
   async headers() {
     return [
@@ -47,7 +51,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  
+
   // Configure development options
   experimental: {
     // Future experimental features can be configured here
