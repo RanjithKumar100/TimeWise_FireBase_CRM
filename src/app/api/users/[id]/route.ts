@@ -113,7 +113,7 @@ export async function PUT(
       }
       user.email = email.toLowerCase().trim();
     }
-    if (role && ['Admin', 'User'].includes(role)) {
+    if (role && ['Admin', 'User', 'Inspection', 'Developer'].includes(role)) {
       user.role = role;
     }
     if (typeof isActive === 'boolean') {

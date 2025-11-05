@@ -22,6 +22,13 @@ export async function seedDatabase() {
         isActive: true,
       },
       {
+        name: 'Developer',
+        email: 'developer@timewise.com',
+        password: 'dev123',
+        role: 'Developer' as const,
+        isActive: true,
+      },
+      {
         name: 'Maria Garcia',
         email: 'maria.garcia@timewise.com',
         password: 'user123',

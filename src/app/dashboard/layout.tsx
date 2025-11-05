@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, LayoutDashboard, Shield, LogOut, User, Settings, Bell, Eye } from 'lucide-react';
+import { Clock, LayoutDashboard, Shield, LogOut, User, Settings, Bell, Eye, Activity } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -136,6 +136,20 @@ export default function DashboardLayout({
                         <Link href="/dashboard/settings" className="group">
                           <Settings className="transition-colors group-hover:text-primary" />
                           <span className="font-medium">Settings</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
+                )}
+
+                {/* Show developer options for developer role */}
+                {user.role === 'Developer' && (
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="System Diagnostics">
+                        <Link href="/dashboard/diagnostics" className="group">
+                          <Activity className="transition-colors group-hover:text-primary" />
+                          <span className="font-medium">Diagnostics</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

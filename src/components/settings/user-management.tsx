@@ -47,7 +47,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'User' | 'Inspection';
+  role: 'Admin' | 'User' | 'Inspection' | 'Developer';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -380,7 +380,7 @@ export default function UserManagement() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="create-role">Role</Label>
-                  <Select value={formData.role} onValueChange={(value: 'Admin' | 'User' | 'Inspection') => setFormData(prev => ({ ...prev, role: value }))}>
+                  <Select value={formData.role} onValueChange={(value: 'Admin' | 'User' | 'Inspection' | 'Developer') => setFormData(prev => ({ ...prev, role: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -388,6 +388,7 @@ export default function UserManagement() {
                       <SelectItem value="User">User</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
                       <SelectItem value="Inspection">Inspection</SelectItem>
+                      <SelectItem value="Developer">Developer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -553,7 +554,7 @@ export default function UserManagement() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-role">Role</Label>
-              <Select value={formData.role} onValueChange={(value: 'Admin' | 'User' | 'Inspection') => setFormData(prev => ({ ...prev, role: value }))}>
+              <Select value={formData.role} onValueChange={(value: 'Admin' | 'User' | 'Inspection' | 'Developer') => setFormData(prev => ({ ...prev, role: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -561,6 +562,7 @@ export default function UserManagement() {
                   <SelectItem value="User">User</SelectItem>
                   <SelectItem value="Admin">Admin</SelectItem>
                   <SelectItem value="Inspection">Inspection</SelectItem>
+                  <SelectItem value="Developer">Developer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

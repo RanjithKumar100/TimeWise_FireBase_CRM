@@ -100,17 +100,17 @@ export function useNotifications() {
 
     try {
       setLoading(true);
-      
+
       const endDate = new Date();
       const startDate = subDays(endDate, 30);
-      
+
       const response = await apiClient.getWorkLogs({
         startDate: format(startDate, 'yyyy-MM-dd'),
         endDate: format(endDate, 'yyyy-MM-dd'),
       });
 
       if (response.success && response.data) {
-        const userLogs = response.data.workLogs.filter(log => 
+        const userLogs = response.data.workLogs.filter(log =>
           user.role === 'Admin' ? true : log.userId === user.id
         );
 
@@ -122,10 +122,10 @@ export function useNotifications() {
         for (let i = 1; i <= 14; i++) {
           const checkDate = subDays(new Date(), i);
           const dateString = format(checkDate, 'yyyy-MM-dd');
-          
+
           if (isWeekend(checkDate)) continue;
           if (loggedDates.has(dateString)) continue;
-          
+
           missing.push({
             date: dateString,
             formattedDate: format(checkDate, 'MMM dd, yyyy'),
@@ -133,10 +133,17 @@ export function useNotifications() {
           });
         }
 
-        const filteredMissing = missing.filter(m => !dismissedNotifications.has(m.date));
-        setMissingDates(filteredMissing);
+        // Use functional state update to avoid dependency on dismissedNotifications
+        setMissingDates(prev => {
+          const filteredMissing = missing.filter(m => !dismissedNotifications.has(m.date));
+          // Only update if the content actually changed
+          if (JSON.stringify(prev) === JSON.stringify(filteredMissing)) {
+            return prev;
+          }
+          return filteredMissing;
+        });
       }
-      
+
       // Also fetch user notifications
       await fetchUserNotifications();
     } catch (error) {
@@ -235,18 +242,21 @@ export function useNotifications() {
     };
   }, [user, refreshNotifications]);
 
-  // Initialize
+  // Initialize - load dismissed notifications once when user changes
   useEffect(() => {
     if (user) {
       loadDismissedNotifications();
     }
   }, [user, loadDismissedNotifications]);
 
+  // Check missing logs once after dismissed notifications are loaded
   useEffect(() => {
-    if (user && dismissedNotifications) {
+    if (user && dismissedNotifications.size >= 0) {
       checkMissingLogs();
     }
-  }, [user, dismissedNotifications, checkMissingLogs]);
+    // Only run when user changes, not when dismissedNotifications changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   return {
     missingDates,

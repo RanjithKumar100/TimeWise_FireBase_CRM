@@ -1,6 +1,6 @@
 export type Verticle = string;
 
-export type UserRole = 'Admin' | 'User' | 'Inspection';
+export type UserRole = 'Admin' | 'User' | 'Inspection' | 'Developer';
 
 export type TimesheetEntry = {
   id: string;
