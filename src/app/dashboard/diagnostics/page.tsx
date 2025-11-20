@@ -21,9 +21,14 @@ import {
   Users,
   Calendar,
   Settings,
-  Info
+  Info,
+  Mail
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { MailSystemControl } from '@/components/settings/mail-system-control';
+import { LiveMonitoring } from '@/components/developer/live-monitoring';
+import { ServerMonitoringLive } from '@/components/developer/server-monitoring-live';
+import { DatabaseMonitoringLive } from '@/components/developer/database-monitoring-live';
 
 interface DiagnosticsData {
   timestamp: string;
@@ -43,6 +48,7 @@ export default function DiagnosticsPage() {
   const [loading, setLoading] = useState(true);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsData | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
 
   const fetchDiagnostics = async () => {
     try {
@@ -179,7 +185,10 @@ export default function DiagnosticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => setShowErrorDetails(!showErrorDetails)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Errors</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -188,6 +197,9 @@ export default function DiagnosticsPage() {
             <div className="text-2xl font-bold">{diagnostics.health.errorCount}</div>
             <p className="text-xs text-muted-foreground">
               {diagnostics.health.warningCount} warnings
+            </p>
+            <p className="text-xs text-blue-600 mt-2 font-medium">
+              Click to {showErrorDetails ? 'hide' : 'view'} details
             </p>
           </CardContent>
         </Card>
@@ -208,136 +220,113 @@ export default function DiagnosticsPage() {
         </Card>
       </div>
 
-      {/* Errors and Warnings */}
-      {(diagnostics.errors.length > 0 || diagnostics.warnings.length > 0) && (
-        <div className="space-y-4">
-          {diagnostics.errors.map((error, idx) => (
-            <Alert key={`error-${idx}`} variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertTitle>{error.category}</AlertTitle>
-              <AlertDescription>{error.message}</AlertDescription>
-            </Alert>
-          ))}
-          {diagnostics.warnings.map((warning, idx) => (
-            <Alert key={`warning-${idx}`}>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>{warning.category}</AlertTitle>
-              <AlertDescription>{warning.message}</AlertDescription>
-            </Alert>
-          ))}
-        </div>
+      {/* Error Details Section - Expandable */}
+      {showErrorDetails && (diagnostics.errors.length > 0 || diagnostics.warnings.length > 0) && (
+        <Card className="border-l-4 border-l-red-500">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  Error & Warning Logs
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  {diagnostics.errors.length} error(s) and {diagnostics.warnings.length} warning(s) detected
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowErrorDetails(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-[500px] overflow-y-auto">
+              {diagnostics.errors.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-red-600 flex items-center gap-2">
+                    <XCircle className="h-4 w-4" />
+                    Errors ({diagnostics.errors.length})
+                  </h4>
+                  {diagnostics.errors.map((error, idx) => (
+                    <Alert key={`error-${idx}`} variant="destructive">
+                      <XCircle className="h-4 w-4" />
+                      <AlertTitle className="flex items-center justify-between">
+                        <span>{error.category}</span>
+                        <Badge variant="destructive" className="ml-2">Error #{idx + 1}</Badge>
+                      </AlertTitle>
+                      <AlertDescription className="mt-2 font-mono text-xs">
+                        {error.message}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              )}
+
+              {diagnostics.warnings.length > 0 && (
+                <div className="space-y-2 mt-4">
+                  <h4 className="font-semibold text-yellow-600 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Warnings ({diagnostics.warnings.length})
+                  </h4>
+                  {diagnostics.warnings.map((warning, idx) => (
+                    <Alert key={`warning-${idx}`}>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle className="flex items-center justify-between">
+                        <span>{warning.category}</span>
+                        <Badge variant="outline" className="ml-2">Warning #{idx + 1}</Badge>
+                      </AlertTitle>
+                      <AlertDescription className="mt-2 font-mono text-xs">
+                        {warning.message}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              )}
+
+              {diagnostics.errors.length === 0 && diagnostics.warnings.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-600" />
+                  <p className="font-medium">No errors or warnings found</p>
+                  <p className="text-sm mt-1">System is running smoothly</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Detailed Information Tabs */}
-      <Tabs defaultValue="server" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="monitoring" className="w-full">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="monitoring">
+            <Activity className="w-4 h-4 mr-1" />
+            Monitoring
+          </TabsTrigger>
           <TabsTrigger value="server">Server</TabsTrigger>
           <TabsTrigger value="database">Database</TabsTrigger>
           <TabsTrigger value="collections">Collections</TabsTrigger>
           <TabsTrigger value="config">Config</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
+          <TabsTrigger value="mail">
+            <Mail className="w-4 h-4 mr-1" />
+            Mail
+          </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="monitoring" className="space-y-4">
+          <LiveMonitoring />
+        </TabsContent>
+
         <TabsContent value="server" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Server className="w-5 h-5" />
-                Server Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Node Version</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.server.nodeVersion}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Environment</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.server.env}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Hostname</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.server.hostname}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">CPUs</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.server.cpus} cores</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <HardDrive className="w-4 h-4" />
-                  Memory Usage
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>Heap Used: {formatBytes(diagnostics.server.memoryUsage.heapUsed)}</div>
-                  <div>Heap Total: {formatBytes(diagnostics.server.memoryUsage.heapTotal)}</div>
-                  <div>RSS: {formatBytes(diagnostics.server.memoryUsage.rss)}</div>
-                  <div>External: {formatBytes(diagnostics.server.memoryUsage.external)}</div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <Cpu className="w-4 h-4" />
-                  System Resources
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>Total Memory: {formatBytes(diagnostics.server.totalMemory)}</div>
-                  <div>Free Memory: {formatBytes(diagnostics.server.freeMemory)}</div>
-                  <div>Memory Used: {Math.round((1 - diagnostics.server.freeMemory / diagnostics.server.totalMemory) * 100)}%</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ServerMonitoringLive diagnostics={diagnostics} />
         </TabsContent>
 
         <TabsContent value="database" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="w-5 h-5" />
-                Database Connection
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Status</p>
-                  <Badge variant={diagnostics.database.status === 'Connected' ? 'default' : 'destructive'}>
-                    {diagnostics.database.status}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Ready State</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.database.readyState}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Host</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.database.host || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Database Name</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.database.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Connection Time</p>
-                  <p className="text-sm text-muted-foreground">{diagnostics.database.connectionTime}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium mb-2">Registered Models</p>
-                <div className="flex flex-wrap gap-2">
-                  {diagnostics.database.models?.map((model: string) => (
-                    <Badge key={model} variant="outline">{model}</Badge>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <DatabaseMonitoringLive diagnostics={diagnostics} />
         </TabsContent>
 
         <TabsContent value="collections" className="space-y-4">
@@ -513,6 +502,10 @@ export default function DiagnosticsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="mail" className="space-y-4">
+          <MailSystemControl />
         </TabsContent>
       </Tabs>
     </div>

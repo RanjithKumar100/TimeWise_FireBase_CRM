@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/helpers';
 import type { TimesheetEntry, Employee } from '@/lib/types';
-import { formatTimeSpent } from '@/lib/time-utils';
-import { formatDateForAPI } from '@/lib/date-utils';
+import { formatTimeSpent } from '@/lib/utils/time';
+import { formatDateForAPI } from '@/lib/utils/date';
 
 interface CalendarViewProps {
   entries: TimesheetEntry[];

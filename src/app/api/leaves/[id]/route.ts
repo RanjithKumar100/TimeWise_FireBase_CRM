@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import Leave from '@/lib/models/Leave';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 
 // DELETE /api/leaves/[id] - Delete a leave date
 export async function DELETE(

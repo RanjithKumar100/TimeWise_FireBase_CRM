@@ -1,4 +1,4 @@
-import { cronService } from './cron-service';
+import { cronService } from '../services/cron';
 
 let isInitialized = false;
 

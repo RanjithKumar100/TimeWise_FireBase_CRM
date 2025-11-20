@@ -51,7 +51,7 @@ const defaultSystemConfig = {
   ]
 };
 
-const configFilePath = path.join(process.cwd(), 'system-config.json');
+const configFilePath = path.join(process.cwd(), 'config/system-config.json');
 
 const readConfig = () => {
   try {

@@ -20,8 +20,8 @@ import CalendarView from '@/components/timesheet/calendar-view';
 import IndividualSummary from '@/components/reports/individual-summary';
 import StatsCard from '@/components/dashboard/stats-card';
 import { ConditionalDataLoader } from '@/components/ui/database-status';
-import { formatDateForAPI } from '@/lib/date-utils';
-import { formatTimeSpent } from '@/lib/time-utils';
+import { formatDateForAPI } from '@/lib/utils/date';
+import { formatTimeSpent } from '@/lib/utils/time';
 
 interface WorkLogEntry {
   id: string;

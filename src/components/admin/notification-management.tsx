@@ -59,12 +59,31 @@ export default function NotificationManagement() {
   const [notificationResults, setNotificationResults] = useState<NotificationResult[]>([]);
   const [stats, setStats] = useState<NotificationStats | null>(null);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [mailSystemEnabled, setMailSystemEnabled] = useState(true);
   const [cronStatus, setCronStatus] = useState<any>(null);
 
   useEffect(() => {
     loadInitialData();
     loadCronStatus();
+    checkMailSystemStatus();
   }, []);
+
+  const checkMailSystemStatus = async () => {
+    try {
+      const response = await fetch('/api/mail-system', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('timewise-auth-token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setMailSystemEnabled(result.data.mailSystemEnabled ?? true);
+      }
+    } catch (error) {
+      console.error('Error checking mail system status:', error);
+    }
+  };
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -293,15 +312,32 @@ export default function NotificationManagement() {
         </div>
       </div>
 
+      {/* Mail System Status Alert */}
+      {!mailSystemEnabled && (
+        <Alert className="border-red-200 bg-red-50">
+          <XCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-900">
+            <strong>Mail System is Currently Disabled</strong>
+            <p className="mt-2">
+              The mail system has been disabled by a developer. No emails will be sent until it is re-enabled.
+              All notification features are temporarily unavailable.
+            </p>
+            <p className="text-sm mt-2 text-red-700">
+              Contact a developer to enable the mail system if this is unexpected.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Email Configuration Alert */}
-      {!emailConfigured && (
+      {!emailConfigured && mailSystemEnabled && (
         <Alert className="border-amber-200 bg-amber-50">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Email is not configured. Please set up email credentials in your environment variables:
             EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_PORT, EMAIL_SECURE
             <Button onClick={testEmailConfiguration} className="ml-4" size="sm" variant="outline">
-              <TestTube className="w-4 h-4 mr-2" />
+              <TestTube className="w-4 w-4 mr-2" />
               Test Configuration
             </Button>
           </AlertDescription>

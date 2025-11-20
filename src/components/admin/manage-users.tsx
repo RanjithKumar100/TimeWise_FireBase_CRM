@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Pagination, PaginationInfo } from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, UserX, UserCheck, Trash2, Shield, User, Eye } from 'lucide-react';
+import { PlusCircle, UserX, UserCheck, Trash2, Shield, User, Eye, Code } from 'lucide-react';
 
 interface ManageUsersProps {
   employees: Employee[];
@@ -27,7 +27,7 @@ interface ManageUsersProps {
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email('Please enter a valid email address.'),
-  role: z.enum(['User', 'Admin', 'Inspection'], { required_error: 'Please select a role.' }),
+  role: z.enum(['User', 'Admin', 'Inspection', 'Developer'], { required_error: 'Please select a role.' }),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
 
@@ -212,6 +212,8 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                           <Shield className="h-4 w-4 text-blue-600" />
                         ) : user.role === 'Inspection' ? (
                           <Eye className="h-4 w-4 text-purple-600" />
+                        ) : user.role === 'Developer' ? (
+                          <Code className="h-4 w-4 text-green-600" />
                         ) : (
                           <User className="h-4 w-4 text-gray-600" />
                         )}
@@ -359,6 +361,7 @@ export default function ManageUsers({ employees, onUserAdded, onUserUpdated, onU
                         <SelectItem value="User">User</SelectItem>
                         <SelectItem value="Admin">Admin</SelectItem>
                         <SelectItem value="Inspection">Inspection</SelectItem>
+                        <SelectItem value="Developer">Developer</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

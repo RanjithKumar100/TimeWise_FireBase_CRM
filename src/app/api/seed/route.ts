@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { seedDatabase } from '@/lib/seed';
-import { createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { seedDatabase } from '@/lib/database/seed';
+import { createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import User from '@/lib/models/User';
 import AuditLog from '@/lib/models/AuditLog';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
-import emailService from '@/lib/email';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
+import emailService from '@/lib/services/email/index';
 
 // GET /api/users - Get all users (Admin and Inspection access)
 export async function GET(request: NextRequest) {

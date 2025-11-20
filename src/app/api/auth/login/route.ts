@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import User from '@/lib/models/User';
-import { generateToken, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { generateToken, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 
 export async function POST(request: NextRequest) {
   try {

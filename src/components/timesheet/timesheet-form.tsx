@@ -17,9 +17,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/helpers';
 import type { TimesheetEntry, Employee } from '@/lib/types';
-import { formatDateForAPI } from '@/lib/date-utils';
+import { formatDateForAPI } from '@/lib/utils/date';
 
 
 // Default task options (will be configurable by admin later)

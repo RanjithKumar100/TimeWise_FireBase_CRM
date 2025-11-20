@@ -83,11 +83,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Image 
-              src="/toprocklogo.png" 
-              alt="Top Rock Global" 
-              width={120} 
-              height={60} 
+            <Image
+              src="/images/logos/lof-logo.png"
+              alt="LOF"
+              width={120}
+              height={60}
               className="object-contain"
             />
           </div>

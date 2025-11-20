@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, User, X, Download, Filter } from 'lucide-react';
 import { ComplianceCalendarView } from './compliance-calendar-view';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/helpers';
 import type { Employee } from '@/lib/types';
 
 interface UserSearchDialogProps {

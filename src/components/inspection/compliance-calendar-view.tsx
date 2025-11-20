@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, Calendar, CheckCircle, XCircle, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isWeekend } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/helpers';
 import type { Employee } from '@/lib/types';
-import { formatDateForAPI } from '@/lib/date-utils';
+import { formatDateForAPI } from '@/lib/utils/date';
 
 interface ComplianceCalendarViewProps {
   user: Employee;

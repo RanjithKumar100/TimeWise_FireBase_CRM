@@ -10,9 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Calendar, Users, Eye, CheckCircle, XCircle, Clock, Download, Filter } from 'lucide-react';
 import { ComplianceCalendarView } from '@/components/inspection/compliance-calendar-view';
 import { UserSearchDialog } from '@/components/inspection/user-search-dialog';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/helpers';
 import type { Employee } from '@/lib/types';
-import { formatDateForAPI } from '@/lib/date-utils';
+import { formatDateForAPI } from '@/lib/utils/date';
 
 interface UserComplianceStats {
   userId: string;

@@ -1,6 +1,6 @@
 import dbConnect from './mongodb';
-import User from './models/User';
-import WorkLog from './models/WorkLog';
+import User from '../models/User';
+import WorkLog from '../models/WorkLog';
 
 export async function seedDatabase() {
   try {

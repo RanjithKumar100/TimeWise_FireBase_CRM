@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format, subDays, isWeekend } from 'date-fns';
 import { useAuth } from './use-auth';
-import { apiClient } from '@/lib/api';
+import { apiClient } from '@/lib/api/client';
 
 export interface MissingLogDate {
   date: string;

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import mongoose from 'mongoose';
-import { createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import NotificationLog from '@/lib/models/NotificationLog';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 
 // GET /api/notifications/user - Get notifications for the current user
 export async function GET(request: NextRequest) {

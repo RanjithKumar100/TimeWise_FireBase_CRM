@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { formatDateForAPI } from '@/lib/date-utils';
+import { formatDateForAPI } from '@/lib/utils/date';
 import {
   Dialog,
   DialogContent,

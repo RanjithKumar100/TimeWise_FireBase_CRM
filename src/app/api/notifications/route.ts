@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
-import { notificationService } from '@/lib/notification-service';
-import { emailService } from '@/lib/email';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
+import { notificationService } from '@/lib/services/notification/index';
+import { emailService } from '@/lib/services/email/index';
 
 // GET /api/notifications - Get notification statistics and recent notifications
 export async function GET(request: NextRequest) {

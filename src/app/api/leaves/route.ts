@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import Leave from '@/lib/models/Leave';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
-import { parseAPIDate } from '@/lib/date-utils';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
+import { parseAPIDate } from '@/lib/utils/date';
 
 // GET /api/leaves - Get all leave dates
 export async function GET(request: NextRequest) {

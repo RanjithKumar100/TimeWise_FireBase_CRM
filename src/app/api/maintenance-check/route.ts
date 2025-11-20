@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-const configFilePath = path.join(process.cwd(), 'system-config.json');
+const configFilePath = path.join(process.cwd(), 'config/system-config.json');
 
 const readConfig = () => {
   try {

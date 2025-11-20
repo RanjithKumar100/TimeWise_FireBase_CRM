@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import User from '@/lib/models/User';
 import PasswordResetToken from '@/lib/models/PasswordResetToken';
 import AuditLog from '@/lib/models/AuditLog';
-import { createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {

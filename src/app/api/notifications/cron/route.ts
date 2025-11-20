@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
-import { cronService } from '@/lib/cron-service';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
+import { cronService } from '@/lib/services/cron/index';
 
 // GET /api/notifications/cron - Get cron job status
 export async function GET(request: NextRequest) {

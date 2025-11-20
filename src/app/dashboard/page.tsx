@@ -17,6 +17,8 @@ export default function DashboardRedirectPage() {
       router.replace('/dashboard/admin');
     } else if (user.role === 'Inspection') {
       router.replace('/dashboard/inspection');
+    } else if (user.role === 'Developer') {
+      router.replace('/dashboard/diagnostics');
     } else {
       router.replace('/dashboard/user');
     }

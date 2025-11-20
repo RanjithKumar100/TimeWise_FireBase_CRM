@@ -8,7 +8,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import type { AggregatedVerticleData } from '@/lib/types';
-import { verticleColors } from '@/lib/colors';
+import { verticleColors } from '@/lib/constants/colors';
 
 interface SummaryChartProps {
   data: AggregatedVerticleData[];

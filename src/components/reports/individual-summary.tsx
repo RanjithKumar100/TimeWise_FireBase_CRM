@@ -7,9 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import SummaryChart from './summary-chart';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
-import { downloadDataAsExcel } from '@/lib/utils';
-import { verticleColors } from '@/lib/colors';
-import { formatTimeSpent } from '@/lib/time-utils';
+import { downloadDataAsExcel } from '@/lib/utils/helpers';
+import { verticleColors } from '@/lib/constants/colors';
+import { formatTimeSpent } from '@/lib/utils/time';
 
 
 interface IndividualSummaryProps {

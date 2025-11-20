@@ -80,7 +80,7 @@ export default function UserManagement() {
     name: '',
     email: '',
     password: '',
-    role: 'User' as 'Admin' | 'User' | 'Inspection',
+    role: 'User' as 'Admin' | 'User' | 'Inspection' | 'Developer',
     isActive: true
   });
 
@@ -448,7 +448,12 @@ export default function UserManagement() {
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <Badge variant={user.role === 'Admin' ? 'default' : user.role === 'Inspection' ? 'outline' : 'secondary'}>
+                      <Badge variant={
+                        user.role === 'Admin' ? 'default' :
+                        user.role === 'Developer' ? 'default' :
+                        user.role === 'Inspection' ? 'outline' :
+                        'secondary'
+                      }>
                         {user.role}
                       </Badge>
                     </TableCell>

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import AuditLog from '@/lib/models/AuditLog';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 
 // GET /api/audit-logs - Get audit logs (Admin only)
 export async function GET(request: NextRequest) {

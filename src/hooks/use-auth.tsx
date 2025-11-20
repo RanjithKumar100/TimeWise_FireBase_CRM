@@ -2,8 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Employee, UserRole } from '@/lib/types';
-import { isAdmin, canManageUsers, canViewAllData, isInspection, canEditTimesheets, shouldShowTimesheetEntry } from '@/lib/permissions';
-import { apiClient, ApiError } from '@/lib/api';
+import { isAdmin, canManageUsers, canViewAllData, isInspection, canEditTimesheets, shouldShowTimesheetEntry } from '@/lib/utils/permissions';
+import { apiClient, ApiError } from '@/lib/api/client';
 
 interface AuthContextType {
   user: Employee | null;

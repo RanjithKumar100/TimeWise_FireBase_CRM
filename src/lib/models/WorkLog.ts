@@ -6,7 +6,7 @@ import path from 'path';
 // Helper function to read system config
 const readSystemConfig = () => {
   try {
-    const configFilePath = path.join(process.cwd(), 'system-config.json');
+    const configFilePath = path.join(process.cwd(), 'config/system-config.json');
     if (fs.existsSync(configFilePath)) {
       const data = fs.readFileSync(configFilePath, 'utf8');
       return JSON.parse(data);

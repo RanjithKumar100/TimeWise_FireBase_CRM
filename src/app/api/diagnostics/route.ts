@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import WorkLog from '@/lib/models/WorkLog';
 import User from '@/lib/models/User';
 import Leave from '@/lib/models/Leave';
 import NotificationLog from '@/lib/models/NotificationLog';
 import AuditLog from '@/lib/models/AuditLog';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
 
     // 4. System Configuration
     try {
-      const configPath = path.join(process.cwd(), 'system-config.json');
+      const configPath = path.join(process.cwd(), 'config/system-config.json');
       if (fs.existsSync(configPath)) {
         const configData = fs.readFileSync(configPath, 'utf8');
         diagnostics.systemConfig = JSON.parse(configData);

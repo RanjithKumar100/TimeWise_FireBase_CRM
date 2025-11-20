@@ -87,6 +87,13 @@ export function isInspection(user: Employee): boolean {
 }
 
 /**
+ * Checks if user has developer privileges
+ */
+export function isDeveloper(user: Employee): boolean {
+  return user.role === 'Developer';
+}
+
+/**
  * Checks if user can manage other users
  */
 export function canManageUsers(user: Employee): boolean {
@@ -125,6 +132,8 @@ export function getRoleDisplayName(role: UserRole): string {
       return 'User';
     case 'Inspection':
       return 'Inspection';
+    case 'Developer':
+      return 'Developer';
     default:
       return 'Unknown';
   }
@@ -134,5 +143,5 @@ export function getRoleDisplayName(role: UserRole): string {
  * Validates if a role is valid
  */
 export function isValidRole(role: string): role is UserRole {
-  return role === 'Admin' || role === 'User' || role === 'Inspection';
+  return role === 'Admin' || role === 'User' || role === 'Inspection' || role === 'Developer';
 }

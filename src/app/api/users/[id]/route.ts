@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/database/mongodb';
 import User from '@/lib/models/User';
 import WorkLog from '@/lib/models/WorkLog';
 import AuditLog from '@/lib/models/AuditLog';
-import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth';
+import { getAuthenticatedUser, createErrorResponse, createSuccessResponse } from '@/lib/auth/index';
 
 // GET /api/users/[id] - Get specific user (Admin only)
 export async function GET(

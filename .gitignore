@@ -42,8 +42,9 @@ next-env.d.ts
 .genkit/*
 
 # environment variables (contains sensitive data)
+.env
 .env.local
-.env.production.local
+.env.*.local
 !.env.example
 
 # firebase
@@ -57,11 +58,21 @@ firestore-debug.log
 # test files
 test-*.js
 test-*.bat
-*.json
 login-response.json
 
 # logs
 *.log
+pm2-logs/
 
 # temporary files
 nul
+test-write.txt
+debug-*.html
+
+# backup files
+/backups/
+*.backup
+
+# production config (contains sensitive data)
+config/system-config.json
+!config/system-config.example.json

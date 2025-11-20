@@ -64,7 +64,7 @@ export default function DashboardLayout({
             <div className="flex items-center gap-3">
   <div className="flex items-center justify-center w-12 h-12 bg-white rounded-lg shadow-sm overflow-hidden">
     <img 
-      src="/TRG-LOGO.png" 
+      src="/images/logos/trg-logo.png" 
       alt="TRG Logo" 
       className="w-8 h-8 object-contain" 
     />
@@ -164,7 +164,7 @@ export default function DashboardLayout({
                 <p className="lab-of-future-brand cursor-default mb-0">DEVELOPED BY</p>
                 <div className="flex items-center justify-center -mt-9">
                   <img 
-                    src="/LOF_alternate.png" 
+                    src="/images/logos/lof-alternate.png" 
                     alt="Lab of Future Logo" 
                     className="lof-logo cursor-pointer"
                   />

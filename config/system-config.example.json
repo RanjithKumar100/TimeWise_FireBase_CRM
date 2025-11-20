@@ -1,0 +1,10 @@
+{
+  "maintenanceMode": false,
+  "maintenanceMessage": "System is currently under maintenance. Please check back later.",
+  "mailSystemEnabled": true,
+  "rollingEditWindow": 3,
+  "cronSchedules": {
+    "missingTimesheetNotification": "0 9 * * *",
+    "hourlyReminder": "0 8-18 * * *"
+  }
+}

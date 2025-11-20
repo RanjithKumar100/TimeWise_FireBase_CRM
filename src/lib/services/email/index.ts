@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
 
 interface EmailConfig {
   host: string;
@@ -9,6 +11,27 @@ interface EmailConfig {
     pass: string;
   };
 }
+
+// Helper function to check if mail system is enabled
+const isMailSystemEnabled = (): boolean => {
+  try {
+    const configFilePath = path.join(process.cwd(), 'config/system-config.json');
+    console.log('🔍 Checking mail system status from:', configFilePath);
+
+    if (fs.existsSync(configFilePath)) {
+      const data = fs.readFileSync(configFilePath, 'utf8');
+      const config = JSON.parse(data);
+      const enabled = config.mailSystemEnabled ?? true;
+      console.log('📧 Mail system enabled status:', enabled);
+      return enabled;
+    } else {
+      console.warn('⚠️ system-config.json not found, defaulting to enabled');
+    }
+  } catch (error) {
+    console.error('❌ Error reading mail system config:', error);
+  }
+  return true; // Default to enabled if config cannot be read
+};
 
 interface EmailOptions {
   to: string;
@@ -106,10 +129,24 @@ class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    if (!this.isConfigured) {
-      console.error('Email service not configured properly');
+    console.log('📬 sendEmail called for:', options.to, '| Subject:', options.subject);
+
+    // Check if mail system is enabled
+    const mailSystemEnabled = isMailSystemEnabled();
+    console.log('🔍 Mail system check result:', mailSystemEnabled);
+
+    if (!mailSystemEnabled) {
+      console.warn('🚫 BLOCKED: Mail system is DISABLED. Email NOT sent to:', options.to);
+      console.warn('🚫 Blocked subject:', options.subject);
       return false;
     }
+
+    if (!this.isConfigured) {
+      console.error('❌ Email service not configured properly');
+      return false;
+    }
+
+    console.log('✅ Mail system enabled, proceeding to send email...');
 
     try {
       const mailOptions = {
@@ -127,6 +164,11 @@ class EmailService {
       console.error('Failed to send email:', error);
       return false;
     }
+  }
+
+  // Check if mail system is currently enabled
+  isMailSystemEnabled(): boolean {
+    return isMailSystemEnabled();
   }
 
   generateMissingTimesheetEmail(userName: string, missingDates: Date[], daysRemaining: number): { subject: string; html: string; text: string } {

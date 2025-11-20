@@ -1,16 +1,31 @@
-import dbConnect from './mongodb';
-import User from './models/User';
-import WorkLog from './models/WorkLog';
-import NotificationLog from './models/NotificationLog';
-import Leave from './models/Leave';
-import { emailService } from './email';
+import dbConnect from '../../database/mongodb';
+import User from '../../models/User';
+import WorkLog from '../../models/WorkLog';
+import NotificationLog from '../../models/NotificationLog';
+import Leave from '../../models/Leave';
+import { emailService } from '../email';
 import fs from 'fs';
 import path from 'path';
+
+// Helper to check mail system status
+const isMailSystemEnabled = (): boolean => {
+  try {
+    const configFilePath = path.join(process.cwd(), 'config/system-config.json');
+    if (fs.existsSync(configFilePath)) {
+      const data = fs.readFileSync(configFilePath, 'utf8');
+      const config = JSON.parse(data);
+      return config.mailSystemEnabled ?? true;
+    }
+  } catch (error) {
+    console.error('Error reading mail system config:', error);
+  }
+  return true;
+};
 
 // Helper function to read system config
 const readSystemConfig = () => {
   try {
-    const configFilePath = path.join(process.cwd(), 'system-config.json');
+    const configFilePath = path.join(process.cwd(), 'config/system-config.json');
     if (fs.existsSync(configFilePath)) {
       const data = fs.readFileSync(configFilePath, 'utf8');
       return JSON.parse(data);
@@ -192,6 +207,12 @@ class NotificationService {
     await dbConnect();
 
     try {
+      // Check if mail system is enabled
+      if (!isMailSystemEnabled()) {
+        console.warn('📧 Mail system is disabled. Skipping notification sending.');
+        return [];
+      }
+
       // If not provided, check for missing entries
       if (!missingEntriesInfo) {
         missingEntriesInfo = await this.checkForMissingEntries();

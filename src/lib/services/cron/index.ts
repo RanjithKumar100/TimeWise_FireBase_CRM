@@ -1,6 +1,6 @@
 import * as cron from 'node-cron';
-import { notificationService } from './notification-service';
-import Leave from './models/Leave';
+import { notificationService } from '../notification';
+import Leave from '../../models/Leave';
 
 class CronService {
   private jobs: Map<string, cron.ScheduledTask> = new Map();
