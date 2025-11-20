@@ -84,8 +84,8 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <Image
-              src="/images/logos/lof-logo.png"
-              alt="LOF"
+              src="/images/logos/toprocklogo.png"
+              alt="Top Rock Global"
               width={120}
               height={60}
               className="object-contain"

@@ -33,12 +33,17 @@ export async function GET(request: NextRequest) {
 
     // 1. Server Information
     try {
+      const memoryUsage = process.memoryUsage();
       diagnostics.server = {
         nodeVersion: process.version,
         platform: process.platform,
         arch: process.arch,
         uptime: process.uptime(),
-        memoryUsage: process.memoryUsage(),
+        memoryUsage: memoryUsage,
+        heapUsed: memoryUsage.heapUsed,
+        heapTotal: memoryUsage.heapTotal,
+        rss: memoryUsage.rss,
+        external: memoryUsage.external,
         cpuUsage: process.cpuUsage(),
         env: process.env.NODE_ENV,
         hostname: os.hostname(),
