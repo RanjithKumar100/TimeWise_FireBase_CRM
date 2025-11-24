@@ -40,6 +40,11 @@ interface EmailOptions {
   text?: string;
 }
 
+// Use global to persist email service initialization status across hot reloads
+declare global {
+  var _emailServiceInitialized: boolean | undefined;
+}
+
 class EmailService {
   private transporter!: nodemailer.Transporter;
   private isConfigured: boolean = false;
@@ -49,15 +54,22 @@ class EmailService {
   }
 
   private initializeTransporter() {
+    // Skip re-initialization during hot reloads in development
+    if (global._emailServiceInitialized && this.isConfigured) {
+      return;
+    }
+
     try {
-      // Debug: Log environment variables (without sensitive data)
-      console.log('Email service initialization:', {
-        host: process.env.EMAIL_HOST || 'not set',
-        port: process.env.EMAIL_PORT || 'not set',
-        user: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.substring(0, 3)}***@${process.env.EMAIL_USER.split('@')[1] || 'not set'}` : 'not set',
-        hasPass: !!process.env.EMAIL_PASS,
-        NODE_ENV: process.env.NODE_ENV
-      });
+      // Only log on first initialization
+      if (!global._emailServiceInitialized) {
+        console.log('Email service initialization:', {
+          host: process.env.EMAIL_HOST || 'not set',
+          port: process.env.EMAIL_PORT || 'not set',
+          user: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.substring(0, 3)}***@${process.env.EMAIL_USER.split('@')[1] || 'not set'}` : 'not set',
+          hasPass: !!process.env.EMAIL_PASS,
+          NODE_ENV: process.env.NODE_ENV
+        });
+      }
 
       const emailConfig: EmailConfig = {
         host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -82,13 +94,18 @@ class EmailService {
 
       this.transporter = nodemailer.createTransport(emailConfig);
       this.isConfigured = true;
-      
-      console.log('Email service initialized successfully with:', {
-        host: emailConfig.host,
-        port: emailConfig.port,
-        secure: emailConfig.secure,
-        user: `${emailConfig.auth.user.substring(0, 3)}***@${emailConfig.auth.user.split('@')[1]}`
-      });
+
+      // Only log on first initialization
+      if (!global._emailServiceInitialized) {
+        console.log('Email service initialized successfully with:', {
+          host: emailConfig.host,
+          port: emailConfig.port,
+          secure: emailConfig.secure,
+          user: `${emailConfig.auth.user.substring(0, 3)}***@${emailConfig.auth.user.split('@')[1]}`
+        });
+      }
+
+      global._emailServiceInitialized = true;
     } catch (error) {
       console.error('Failed to initialize email service:', error);
       this.isConfigured = false;
