@@ -56,6 +56,9 @@ const nextConfig: NextConfig = {
   experimental: {
     // Future experimental features can be configured here
   },
+
+  // Fix: Cross-origin warning for dev server (Next.js 15+)
+  allowedDevOrigins: ['timewise.cmis.ac.in'],
 };
 
 export default nextConfig;

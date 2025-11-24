@@ -19,6 +19,9 @@ if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
+// Track if event listeners have been attached
+let listenersAttached = false;
+
 // Connection retry configuration
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
@@ -51,16 +54,16 @@ async function dbConnect(): Promise<mongoose.Connection> {
       // Connection pool settings for multiple concurrent users
       maxPoolSize: 50, // Maximum number of connections in the pool (increased for multiple users)
       minPoolSize: 10, // Minimum number of connections to maintain
-      maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      serverSelectionTimeoutMS: 10000, // Timeout for server selection (10 seconds)
+      maxIdleTimeMS: 300000, // Close connections after 5 minutes of inactivity (increased from 30s)
+      socketTimeoutMS: 60000, // Close sockets after 60 seconds of inactivity (increased from 45s)
+      serverSelectionTimeoutMS: 30000, // Timeout for server selection (30 seconds - increased from 10s)
       heartbeatFrequencyMS: 10000, // Check connection health every 10 seconds
       // Retry settings
       retryWrites: true, // Retry write operations that fail due to network errors
       retryReads: true, // Retry read operations that fail due to network errors
       // Additional settings
       compressors: ['zlib'], // Enable compression for better performance
-      connectTimeoutMS: 10000, // Connection timeout (10 seconds)
+      connectTimeoutMS: 30000, // Connection timeout (30 seconds - increased from 10s)
     };
 
     console.log('🔌 Establishing new MongoDB connection...');
@@ -74,19 +77,26 @@ async function dbConnect(): Promise<mongoose.Connection> {
       if (mongooseInstance && (mongooseInstance as any).connection) {
         cached!.conn = (mongooseInstance as any).connection;
 
-        // Setup connection event listeners
-        cached!.conn.on('error', (error) => {
-          console.error('❌ MongoDB connection error:', error);
-        });
+        // Setup connection event listeners ONLY ONCE
+        if (!listenersAttached) {
+          // Increase max listeners to prevent warnings
+          cached!.conn.setMaxListeners(20);
 
-        cached!.conn.on('disconnected', () => {
-          console.warn('⚠️ MongoDB disconnected. Will reconnect on next request.');
-          // Don't reset cached connection here, let dbConnect handle it
-        });
+          cached!.conn.on('error', (error) => {
+            console.error('❌ MongoDB connection error:', error);
+          });
 
-        cached!.conn.on('reconnected', () => {
-          console.log('✅ MongoDB reconnected successfully');
-        });
+          cached!.conn.on('disconnected', () => {
+            console.warn('⚠️ MongoDB disconnected. Will reconnect on next request.');
+            // Don't reset cached connection here, let dbConnect handle it
+          });
+
+          cached!.conn.on('reconnected', () => {
+            console.log('✅ MongoDB reconnected successfully');
+          });
+
+          listenersAttached = true;
+        }
 
         console.log(`✅ Connected to MongoDB (Pool size: 10-50 connections)`);
         return cached!.conn;

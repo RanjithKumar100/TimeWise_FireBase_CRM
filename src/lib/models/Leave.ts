@@ -37,7 +37,7 @@ const LeaveSchema: Schema = new Schema(
 );
 
 // Index for better query performance
-LeaveSchema.index({ date: 1 });
+// Note: 'date' field already has unique index from schema definition (line 21)
 LeaveSchema.index({ createdAt: -1 });
 
 // Static method to check if a date is a leave day
